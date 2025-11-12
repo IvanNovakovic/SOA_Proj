@@ -56,9 +56,9 @@ func main() {
 	}).Methods("GET")
 
 	// protected user routes
-	// protected := router.PathPrefix("").Subrouter()
-	handler.RegisterRoutes(router, repo)
-	// protected.Use(handler.JWTAuthMiddleware)
+	protected := router.PathPrefix("").Subrouter()
+	handler.RegisterRoutes(protected, repo)
+	protected.Use(handler.JWTAuthMiddleware)
 
 	srv := &http.Server{
 		Handler: router,

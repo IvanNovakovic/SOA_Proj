@@ -7,12 +7,16 @@ meta {
 get {
   url: http://localhost:8080/users?skip=0&limit=50
   body: none
-  auth: inherit
+  auth: bearer
 }
 
 params:query {
   skip: 0
   limit: 50
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiI2OTE0ZjVmZDFkOTk2ZGFmZGRmOGE2NTciLCJ1c2VybmFtZSI6ImtpdG9tYmVyIiwicm9sZXMiOlsidXNlciJdLCJhdWQiOlsiIl0sImV4cCI6MTc2Mjk4NTM1MCwibmJmIjoxNzYyOTgxNzUwLCJpYXQiOjE3NjI5ODE3NTB9.wt1M5GjFhAohfUEfGu7SvujZ2SKsZEoquggRT9ieAUk
 }
 
 settings {

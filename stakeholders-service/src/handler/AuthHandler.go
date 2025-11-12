@@ -52,6 +52,19 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "hash error", http.StatusInternalServerError)
 		return
 	}
+
+	// Validate location if provided
+	if in.Address.Location != nil {
+		if in.Address.Location.Type != "" && in.Address.Location.Type != "Point" {
+			http.Error(w, "invalid location type, must be 'Point' or omitted", http.StatusBadRequest)
+			return
+		}
+		// If type is empty, set location to nil to omit it from BSON
+		if in.Address.Location.Type == "" {
+			in.Address.Location = nil
+		}
+	}
+
 	u := model.User{
 		Username: in.Username,
 		Password: hash,

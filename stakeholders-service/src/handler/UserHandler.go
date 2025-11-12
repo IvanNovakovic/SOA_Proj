@@ -25,11 +25,6 @@ type UserHandler struct {
 func RegisterRoutes(router *mux.Router, userRepo *repository.UserRepository) {
 	h := &UserHandler{repo: userRepo}
 
-	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	}).Methods("GET")
-
 	router.HandleFunc("/users", h.ListUsers).Methods("GET")
 	router.HandleFunc("/users", h.CreateUser).Methods("POST")
 	router.HandleFunc("/users/{id}", h.GetUserByID).Methods("GET")
