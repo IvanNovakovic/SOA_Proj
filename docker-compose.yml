@@ -24,6 +24,21 @@ services:
       - "8080:8080"
     restart: unless-stopped
 
+  blog-service:
+    build:
+      context: ./blog-service
+      dockerfile: Dockerfile
+    container_name: blog-service
+    depends_on:
+      - mongo
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
+      - DB_NAME=blogs
+      - PORT=8081
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+
 
 
 
