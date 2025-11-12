@@ -1,0 +1,43 @@
+meta {
+  name: Create User
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:8080/users
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "username": "kita",
+    "password": "secret123",
+    "email": "kita@example.com",
+    "name": "Ivan",
+    "surname": "Novakovic",
+    "roles": [
+      "user"
+    ],
+    "address": {
+      "street": "Bulevar Jase Tomica 4",
+      "city": "Novi Sad",
+      "state": "",
+      "postal_code": "21000",
+      "country": "Serbia",
+      "location": {
+        "type": "Point",
+        "coordinates": [
+          45.266075615395835,
+          19.829685323782343
+        ]
+      }
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

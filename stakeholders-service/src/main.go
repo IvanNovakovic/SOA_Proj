@@ -47,7 +47,18 @@ func main() {
 
 	repo := repository.NewUserRepository(client.Database(dbName))
 	router := mux.NewRouter()
+
+	// public
+	handler.RegisterAuthRoutes(router, repo)
+	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	}).Methods("GET")
+
+	// protected user routes
+	// protected := router.PathPrefix("").Subrouter()
 	handler.RegisterRoutes(router, repo)
+	// protected.Use(handler.JWTAuthMiddleware)
 
 	srv := &http.Server{
 		Handler: router,

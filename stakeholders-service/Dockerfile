@@ -16,7 +16,7 @@ FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /app/stakeholders-service ./stakeholders-service
 
-ENV PORT=8080
+# ENV PORT=8080
 EXPOSE 8080
 
 CMD ["./stakeholders-service"]
