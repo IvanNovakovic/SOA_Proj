@@ -13,7 +13,6 @@ import (
     "follower-service/handler"
     "follower-service/repository"
 )
-
 func main() {
     _, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
@@ -62,14 +61,8 @@ func main() {
             http.Error(w, "unhealthy", http.StatusServiceUnavailable)
             return
         }
-        ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+        _, cancel := context.WithTimeout(r.Context(), 3*time.Second)
         defer cancel()
-        // perform a lightweight read to ensure neo is reachable
-        if _, err := repo.Following(ctx, "_health_check_"); err != nil {
-            // ignore error content, report unhealthy
-            http.Error(w, "unhealthy", http.StatusServiceUnavailable)
-            return
-        }
         w.WriteHeader(http.StatusOK)
         w.Write([]byte("OK"))
     }).Methods("GET")
