@@ -16,6 +16,7 @@ type TourRepository struct {
     client *mongo.Client
     col    *mongo.Collection
     kpCol  *mongo.Collection
+    revCol *mongo.Collection
 }
 
 func NewTourRepository(ctx context.Context, uri string, dbName string) (*TourRepository, error) {
@@ -28,14 +29,22 @@ func NewTourRepository(ctx context.Context, uri string, dbName string) (*TourRep
     db := client.Database(dbName)
     col := db.Collection("tours")
     kpCol := db.Collection("keypoints")
-    // create simple index on authorId and tourId
+    revCol := db.Collection("reviews")
+    // create simple index on authorId and tourId and indexes for keypoints/reviews
     _, _ = col.Indexes().CreateOne(ctx, mongo.IndexModel{
         Keys: bson.D{{Key: "authorId", Value: 1}},
     })
     _, _ = kpCol.Indexes().CreateOne(ctx, mongo.IndexModel{
         Keys: bson.D{{Key: "tourId", Value: 1}},
     })
-    return &TourRepository{client: client, col: col, kpCol: kpCol}, nil
+    // reviews: index by tourId to lookup reviews for a tour, and by authorId if needed
+    _, _ = revCol.Indexes().CreateOne(ctx, mongo.IndexModel{
+        Keys: bson.D{{Key: "tourId", Value: 1}},
+    })
+    _, _ = revCol.Indexes().CreateOne(ctx, mongo.IndexModel{
+        Keys: bson.D{{Key: "authorId", Value: 1}},
+    })
+    return &TourRepository{client: client, col: col, kpCol: kpCol, revCol: revCol}, nil
 }
 
 func (r *TourRepository) Close(ctx context.Context) error {
@@ -107,4 +116,42 @@ func (r *TourRepository) GetKeyPointsByTour(ctx context.Context, tourId primitiv
         kps = append(kps, kp)
     }
     return kps, nil
+}
+
+// Review methods
+func (r *TourRepository) CreateReview(ctx context.Context, rev *model.Review) (*model.Review, error) {
+    if rev == nil {
+        return nil, mongo.ErrNilDocument
+    }
+    rev.CreatedAt = time.Now().UTC()
+    if rev.Rating < 1 {
+        rev.Rating = 1
+    }
+    if rev.Rating > 5 {
+        rev.Rating = 5
+    }
+    res, err := r.revCol.InsertOne(ctx, rev)
+    if err != nil {
+        return nil, err
+    }
+    rev.ID = res.InsertedID.(primitive.ObjectID)
+    return rev, nil
+}
+
+func (r *TourRepository) GetReviewsByTour(ctx context.Context, tourId primitive.ObjectID) ([]model.Review, error) {
+    filter := bson.M{"tourId": tourId}
+    cur, err := r.revCol.Find(ctx, filter)
+    if err != nil {
+        return nil, err
+    }
+    defer cur.Close(ctx)
+    var out []model.Review
+    for cur.Next(ctx) {
+        var rev model.Review
+        if err := cur.Decode(&rev); err != nil {
+            return nil, err
+        }
+        out = append(out, rev)
+    }
+    return out, nil
 }

@@ -17,4 +17,3 @@ type Tour struct {
     Price       float64            `bson:"price" json:"price"`
     CreatedAt   time.Time          `bson:"createdAt" json:"createdAt"`
 }
-//TODO: add keypoints and reviews

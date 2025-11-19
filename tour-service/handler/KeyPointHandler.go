@@ -18,8 +18,8 @@ type kpRepo interface {
 }
 
 func RegisterKeyPointRoutes(r *mux.Router, repo kpRepo) {
-    r.HandleFunc("/tours/{tourId}/keypoints", createKeyPointHandler(repo)).Methods("POST")
-    r.HandleFunc("/tours/{tourId}/keypoints", listKeyPointsHandler(repo)).Methods("GET")
+    r.HandleFunc("/tours/{tourId}/keypoints", createKeyPoint(repo)).Methods("POST")
+    r.HandleFunc("/tours/{tourId}/keypoints", listKeyPoints(repo)).Methods("GET")
 }
 
 type createKeyPointRequest struct {
@@ -30,7 +30,7 @@ type createKeyPointRequest struct {
     Longitude   float64 `json:"longitude"`
 }
 
-func createKeyPointHandler(repo kpRepo) http.HandlerFunc {
+func createKeyPoint(repo kpRepo) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         vars := mux.Vars(r)
         tourIdStr := vars["tourId"]
@@ -74,7 +74,7 @@ func createKeyPointHandler(repo kpRepo) http.HandlerFunc {
     }
 }
 
-func listKeyPointsHandler(repo kpRepo) http.HandlerFunc {
+func listKeyPoints(repo kpRepo) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         vars := mux.Vars(r)
         tourIdStr := vars["tourId"]

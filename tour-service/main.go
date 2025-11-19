@@ -41,6 +41,7 @@ func main() {
 
     handler.RegisterRoutes(r, repo)
     handler.RegisterKeyPointRoutes(r, repo)
+    handler.RegisterReviewRoutes(r, repo)
 
     srv := &http.Server{
         Handler:      r,

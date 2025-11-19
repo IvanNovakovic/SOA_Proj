@@ -1,0 +1,29 @@
+meta {
+  name: create REV
+  type: http
+  seq: 5
+}
+
+post {
+  url: http://localhost:8083/tours/691dfe7b057297ed44028d85/reviews
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "authorId": "admin123",
+    "authorName": "Ivan Smrad",
+    "rating": 1,
+    "comment": "Fantastic tour — great guide and amazing views!",
+    "images": [
+      "https://example.org/photos/tour1-1.jpg",
+      "https://example.org/photos/tour1-2.jpg"
+    ]
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
