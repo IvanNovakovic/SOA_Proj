@@ -1,0 +1,26 @@
+meta {
+  name: create KP
+  type: http
+  seq: 3
+}
+
+post {
+  url: http://localhost:8083/tours/691dfe7b057297ed44028d85/keypoints
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+      "name": "Old Fortress",
+      "description": "Historic fortress on the hill with panoramic views and museum.",
+      "imageUrl": "https://example.org/images/fortress.jpg",
+      "latitude": 44.7908,
+      "longitude": 20.4445
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

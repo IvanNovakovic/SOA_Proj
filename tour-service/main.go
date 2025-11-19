@@ -40,6 +40,7 @@ func main() {
     }).Methods("GET")
 
     handler.RegisterRoutes(r, repo)
+    handler.RegisterKeyPointRoutes(r, repo)
 
     srv := &http.Server{
         Handler:      r,
