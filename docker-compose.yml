@@ -43,7 +43,7 @@ services:
     image: neo4j:5.10
     container_name: neo4j
     environment:
-      - NEO4J_AUTH=neo4j/test
+      - NEO4J_AUTH=neo4j/testtest123
     ports:
       - "7474:7474"
       - "7687:7687"
@@ -70,3 +70,4 @@ services:
 
 volumes:
   mongo-data:
+  neo4j-data:
