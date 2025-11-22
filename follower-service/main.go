@@ -10,6 +10,7 @@ import (
 
     "github.com/gorilla/mux"
 
+    "follower-service/auth"
     "follower-service/handler"
     "follower-service/repository"
 )
@@ -66,7 +67,12 @@ func main() {
         w.WriteHeader(http.StatusOK)
         w.Write([]byte("OK"))
     }).Methods("GET")
-    handler.RegisterRoutes(r, repo)
+    
+    // create an auth-protected subrouter for protected routes
+    authSub := r.PathPrefix("").Subrouter()
+    authSub.Use(func(next http.Handler) http.Handler { return auth.JWTAuthMiddleware(next) })
+    
+    handler.RegisterRoutes(r, authSub, repo)
 
     srv := &http.Server{
         Handler:      r,

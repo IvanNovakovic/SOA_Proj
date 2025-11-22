@@ -9,6 +9,7 @@ import (
 
     "github.com/gorilla/mux"
     "go.mongodb.org/mongo-driver/bson/primitive"
+    "tour-service/auth"
     "tour-service/model"
 )
 
@@ -17,14 +18,16 @@ type reviewRepo interface {
     GetReviewsByTour(ctx context.Context, tourId primitive.ObjectID) ([]model.Review, error)
 }
 
-func RegisterReviewRoutes(r *mux.Router, repo reviewRepo) {
-    r.HandleFunc("/tours/{tourId}/reviews", createReview(repo)).Methods("POST")
-    r.HandleFunc("/tours/{tourId}/reviews", listReviews(repo)).Methods("GET")
+func RegisterReviewRoutes(public *mux.Router, authRouter *mux.Router, repo reviewRepo) {
+    // protected routes
+    if authRouter != nil {
+        authRouter.HandleFunc("/tours/{tourId}/reviews", createReview(repo)).Methods("POST")
+    }
+    // public routes
+    public.HandleFunc("/tours/{tourId}/reviews", listReviews(repo)).Methods("GET")
 }
 
 type createReviewRequest struct {
-    AuthorID   string    `json:"authorId"`
-    AuthorName string    `json:"authorName,omitempty"`
     Rating     int       `json:"rating"`
     Comment    string    `json:"comment,omitempty"`
     Images     []string  `json:"images,omitempty"`
@@ -33,6 +36,13 @@ type createReviewRequest struct {
 
 func createReview(repo reviewRepo) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
+        // Extract authenticated user ID from JWT
+        a := auth.GetAuth(r)
+        if a == nil || a.UserID == "" {
+            http.Error(w, "unauthorized", http.StatusUnauthorized)
+            return
+        }
+        
         vars := mux.Vars(r)
         tourIdStr := vars["tourId"]
         if tourIdStr == "" {
@@ -49,14 +59,14 @@ func createReview(repo reviewRepo) http.HandlerFunc {
             http.Error(w, "invalid body", http.StatusBadRequest)
             return
         }
-        if req.AuthorID == "" || req.Rating < 1 || req.Rating > 5 {
-            http.Error(w, "authorId and rating(1-5) required", http.StatusBadRequest)
+        if req.Rating < 1 || req.Rating > 5 {
+            http.Error(w, "rating(1-5) required", http.StatusBadRequest)
             return
         }
         rev := &model.Review{
             TourID:     tourID,
-            AuthorID:   req.AuthorID,
-            AuthorName: req.AuthorName,
+            AuthorID:   a.UserID,
+            AuthorName: a.Username,
             Rating:     req.Rating,
             Comment:    req.Comment,
             Images:     req.Images,

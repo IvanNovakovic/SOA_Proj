@@ -7,6 +7,7 @@ import (
 
     "github.com/gorilla/mux"
 
+    "follower-service/auth"
     "follower-service/repository"
 )
 
@@ -19,26 +20,38 @@ type followHandler struct {
     repo *repository.NeoRepository
 }
 
-func RegisterRoutes(r *mux.Router, repo *repository.NeoRepository) {
+func RegisterRoutes(public *mux.Router, authRouter *mux.Router, repo *repository.NeoRepository) {
     h := &followHandler{repo: repo}
-    r.HandleFunc("/follow", h.follow).Methods("POST")
-    r.HandleFunc("/follow", h.unfollow).Methods("DELETE")
-    r.HandleFunc("/followers/{id}", h.getFollowers).Methods("GET")
-    r.HandleFunc("/following/{id}", h.getFollowing).Methods("GET")
-    r.HandleFunc("/recommendations/{id}", h.recommendations).Methods("GET")
+    // protected routes
+    if authRouter != nil {
+        authRouter.HandleFunc("/follow", h.follow).Methods("POST")
+        authRouter.HandleFunc("/follow", h.unfollow).Methods("DELETE")
+    }
+    // public routes
+    public.HandleFunc("/followers/{id}", h.getFollowers).Methods("GET")
+    public.HandleFunc("/following/{id}", h.getFollowing).Methods("GET")
+    public.HandleFunc("/recommendations/{id}", h.recommendations).Methods("GET")
 }
 
 func (h *followHandler) follow(w http.ResponseWriter, r *http.Request) {
+    // Extract authenticated user ID from JWT
+    a := auth.GetAuth(r)
+    if a == nil || a.UserID == "" {
+        http.Error(w, "unauthorized", http.StatusUnauthorized)
+        return
+    }
+    
     var in followReq
     if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
         http.Error(w, "invalid body", http.StatusBadRequest)
         return
     }
-    if in.Follower == "" || in.Followee == "" {
-        http.Error(w, "follower and followee required", http.StatusBadRequest)
+    if in.Followee == "" {
+        http.Error(w, "followee required", http.StatusBadRequest)
         return
     }
-    if err := h.repo.Follow(r.Context(), in.Follower, in.Followee); err != nil {
+    // Use authenticated user ID as follower
+    if err := h.repo.Follow(r.Context(), a.UserID, in.Followee); err != nil {
         http.Error(w, "failed to follow: "+err.Error(), http.StatusInternalServerError)
         return
     }
@@ -46,16 +59,24 @@ func (h *followHandler) follow(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *followHandler) unfollow(w http.ResponseWriter, r *http.Request) {
+    // Extract authenticated user ID from JWT
+    a := auth.GetAuth(r)
+    if a == nil || a.UserID == "" {
+        http.Error(w, "unauthorized", http.StatusUnauthorized)
+        return
+    }
+    
     var in followReq
     if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
         http.Error(w, "invalid body", http.StatusBadRequest)
         return
     }
-    if in.Follower == "" || in.Followee == "" {
-        http.Error(w, "follower and followee required", http.StatusBadRequest)
+    if in.Followee == "" {
+        http.Error(w, "followee required", http.StatusBadRequest)
         return
     }
-    if _, err := h.repo.Unfollow(r.Context(), in.Follower, in.Followee); err != nil {
+    // Use authenticated user ID as follower
+    if _, err := h.repo.Unfollow(r.Context(), a.UserID, in.Followee); err != nil {
         http.Error(w, "failed to unfollow: "+err.Error(), http.StatusInternalServerError)
         return
     }

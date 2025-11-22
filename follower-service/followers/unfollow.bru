@@ -1,0 +1,26 @@
+meta {
+  name: unfollow
+  type: http
+  seq: 4
+}
+
+delete {
+  url: http://localhost:8080/follow
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiI2OTE3NTE4ODQ0ZDFlODk4NTQzMjBkYTAiLCJ1c2VybmFtZSI6ImtpdG9tYmVyIiwicm9sZXMiOlsidXNlciJdLCJhdWQiOlsiIl0sImV4cCI6MTc2MzgzNDQ4MSwibmJmIjoxNzYzODMwODgxLCJpYXQiOjE3NjM4MzA4ODF9.PF2dXSZ0IsSEVmDuy5EYgKIpsChLcx8LOplrw9BJ8LQ
+}
+
+body:json {
+  {
+    "Followee" : "123"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

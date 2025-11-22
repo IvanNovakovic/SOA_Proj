@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/gorilla/mux v1.8.1
 	go.mongodb.org/mongo-driver v1.17.6
+    github.com/golang-jwt/jwt/v5 v5.0.0
 )
 
 require (

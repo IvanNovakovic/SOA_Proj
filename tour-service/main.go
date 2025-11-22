@@ -10,6 +10,7 @@ import (
 
     "github.com/gorilla/mux"
 
+    "tour-service/auth"
     "tour-service/handler"
     "tour-service/repository"
 )
@@ -39,9 +40,13 @@ func main() {
         w.Write([]byte("OK"))
     }).Methods("GET")
 
-    handler.RegisterRoutes(r, repo)
-    handler.RegisterKeyPointRoutes(r, repo)
-    handler.RegisterReviewRoutes(r, repo)
+    // create an auth-protected subrouter for protected routes
+    authSub := r.PathPrefix("").Subrouter()
+    authSub.Use(func(next http.Handler) http.Handler { return auth.JWTAuthMiddleware(next) })
+
+    handler.RegisterRoutes(r, authSub, repo)
+    handler.RegisterKeyPointRoutes(r, authSub, repo)
+    handler.RegisterReviewRoutes(r, authSub, repo)
 
     srv := &http.Server{
         Handler:      r,

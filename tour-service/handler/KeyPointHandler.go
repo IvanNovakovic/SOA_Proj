@@ -17,9 +17,13 @@ type kpRepo interface {
     GetKeyPointsByTour(ctx context.Context, tourId primitive.ObjectID) ([]model.KeyPoint, error)
 }
 
-func RegisterKeyPointRoutes(r *mux.Router, repo kpRepo) {
-    r.HandleFunc("/tours/{tourId}/keypoints", createKeyPoint(repo)).Methods("POST")
-    r.HandleFunc("/tours/{tourId}/keypoints", listKeyPoints(repo)).Methods("GET")
+func RegisterKeyPointRoutes(public *mux.Router, authRouter *mux.Router, repo kpRepo) {
+    // protected routes
+    if authRouter != nil {
+        authRouter.HandleFunc("/tours/{tourId}/keypoints", createKeyPoint(repo)).Methods("POST")
+    }
+    // public routes
+    public.HandleFunc("/tours/{tourId}/keypoints", listKeyPoints(repo)).Methods("GET")
 }
 
 type createKeyPointRequest struct {

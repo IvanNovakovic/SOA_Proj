@@ -8,6 +8,7 @@ import (
     "time"
 
     "github.com/gorilla/mux"
+    "tour-service/auth"
     "tour-service/model"
 )
 
@@ -16,33 +17,42 @@ type tourRepo interface {
     GetToursByAuthor(ctx context.Context, authorId string) ([]model.Tour, error)
 }
 
-func RegisterRoutes(r *mux.Router, repo tourRepo) {
-    r.HandleFunc("/tours", createTour(repo)).Methods("POST")
-    r.HandleFunc("/tours/author/{authorId}", listToursByAuthor(repo)).Methods("GET")
+func RegisterRoutes(public *mux.Router, authRouter *mux.Router, repo tourRepo) {
+    // protected routes
+    if authRouter != nil {
+        authRouter.HandleFunc("/tours", createTour(repo)).Methods("POST")
+    }
+    // public routes
+    public.HandleFunc("/tours/author/{authorId}", listToursByAuthor(repo)).Methods("GET")
 }
 
 type createTourRequest struct {
-    AuthorID    string   `json:"authorId"`
     Name        string   `json:"name"`
     Description string   `json:"description"`
     Difficulty  string   `json:"difficulty"`
     Tags        []string `json:"tags"`
 }
 
-//TODO: use authentication to get authorId, need authentication service
 func createTour(repo tourRepo) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
+        // Extract authenticated user ID from JWT
+        a := auth.GetAuth(r)
+        if a == nil || a.UserID == "" {
+            http.Error(w, "unauthorized", http.StatusUnauthorized)
+            return
+        }
+        
         var req createTourRequest
         if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
             http.Error(w, "invalid request", http.StatusBadRequest)
             return
         }
-        if req.AuthorID == "" || req.Name == "" {
-            http.Error(w, "authorId and name are required", http.StatusBadRequest)
+        if req.Name == "" {
+            http.Error(w, "name is required", http.StatusBadRequest)
             return
         }
         t := &model.Tour{
-            AuthorID:    req.AuthorID,
+            AuthorID:    a.UserID,
             Name:        req.Name,
             Description: req.Description,
             Difficulty:  req.Difficulty,
