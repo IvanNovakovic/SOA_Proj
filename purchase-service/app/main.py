@@ -181,54 +181,106 @@ def get_cart(current_user: str = Depends(get_current_user)):
 
 @app.post('/cart/checkout', response_model=CheckoutResult)
 def checkout(current_user: str = Depends(get_current_user)):
-    # Saga orchestrator: for each item validate and create token & purchase record, on error compensate
+    #SAGA orchestrator for checkout process.
     user_id = current_user
+
+    # === SAGA STEP 1: FETCH CART STATE ===
     cart = cart_col.find_one({'user_id': user_id})
     if not cart or not cart.get('items'):
         raise HTTPException(status_code=400, detail='cart empty')
+    
+    # === SAGA STEP 2: VALIDATE NO DUPLICATE PURCHASES ===
+    tour_ids_in_cart = [item.get('tour_id') for item in cart['items']]
+    existing_tokens = list(tokens_col.find({'user_id': user_id, 'tour_id': {'$in': tour_ids_in_cart}}))
+    if existing_tokens:
+        # User already owns at least one tour from the cart
+        owned_tour_id = existing_tokens[0]['tour_id']
+        tour_name = next((item.get('name', 'Unknown') for item in cart['items'] if item.get('tour_id') == owned_tour_id), 'Unknown')
+        raise HTTPException(
+            status_code=400, 
+            detail=f"You have already purchased the tour: '{tour_name}'."
+        )
+    
+    # === SAGA STEP 3: VALIDATE ALL TOURS ARE PUBLISHED/AVAILABLE ===
+    for item in cart['items']:
+        tour_id = item.get('tour_id')
+        tour = get_tour(tour_id)
+        if not tour:
+            raise HTTPException(status_code=400, detail=f"Tour '{item.get('name', tour_id)}' not found.")
+        status = tour.get('status') if isinstance(tour, dict) else tour.get('Status')
+        # Check for 'published' status (or not 'archived' as fallback)
+        if status == 'archived' or (status and status.lower() not in ['published', 'active']):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Tour '{item.get('name', tour_id)}' is no longer available for purchase."
+            )
+    
+    # === SAGA STEP 4: PROCESS PAYMENT (SIMULATED) ===
+    total_amount = sum(float(item.get('price', 0)) for item in cart['items'])
+    payment_successful = simulate_payment(total_amount)
+    if not payment_successful:
+        raise HTTPException(status_code=402, detail='Payment processing failed.')
+    
+    # === SAGA STEP 5: CREATE TOKENS AND PURCHASES (ATOMIC OPERATIONS) ===
     created_tokens = []
     created_purchases = []
-    failed = []
     try:
+        # Create all tokens and purchases in one transaction-like batch
         for item in cart['items']:
             tour_id = item.get('tour_id')
-            # check tour exists and is not archived
-            tour = get_tour(tour_id)
-            if not tour:
-                failed.append({'item': item, 'reason': 'tour_not_found'})
-                break
-            status = tour.get('status') if isinstance(tour, dict) else tour.get('Status')
-            if status == 'archived':
-                failed.append({'item': item, 'reason': 'tour_archived'})
-                break
-            # create token
             token = str(uuid.uuid4())
             tok_doc = {'token': token, 'user_id': user_id, 'tour_id': tour_id, 'created_at': datetime.utcnow()}
             tokens_col.insert_one(tok_doc)
             created_tokens.append(tok_doc)
-            # create purchase record
+            
             purchase_doc = {'user_id': user_id, 'tour_id': tour_id, 'token': token, 'created_at': datetime.utcnow()}
             purchases_col.insert_one(purchase_doc)
             created_purchases.append(purchase_doc)
-        if failed:
-            # compensation: remove created tokens and purchases
-            for t in created_tokens:
-                tokens_col.delete_one({'token': t['token']})
-            for p in created_purchases:
-                purchases_col.delete_one({'token': p['token']})
-            failed_safe = _stringify_objectids(failed)
-            return CheckoutResult(user_id=user_id, purchased=[], failed=failed_safe)
-        # success: clear cart
+        
+        # === SAGA STEP 6: CLEAR CART ON SUCCESS ===
         cart_col.delete_one({'user_id': user_id})
         purchased_safe = _stringify_objectids(created_purchases)
         return CheckoutResult(user_id=user_id, purchased=purchased_safe, failed=[])
+        
     except Exception as e:
-        # compensation
+        # === SAGA COMPENSATION: ROLLBACK DATABASE CHANGES ===
+        logging.error("Database operation failed during checkout. Rolling back tokens/purchases for user %s", user_id)
         for t in created_tokens:
-            tokens_col.delete_one({'token': t['token']})
+            try:
+                tokens_col.delete_one({'token': t['token']})
+            except Exception as del_err:
+                logging.error("Failed to delete token during rollback: %s", del_err)
         for p in created_purchases:
-            purchases_col.delete_one({'token': p['token']})
-        raise HTTPException(status_code=500, detail=str(e))
+            try:
+                purchases_col.delete_one({'token': p['token']})
+            except Exception as del_err:
+                logging.error("Failed to delete purchase during rollback: %s", del_err)
+        
+        # === SAGA COMPENSATION: REFUND PAYMENT ===
+        refund_successful = refund_payment(user_id, total_amount)
+        if not refund_successful:
+            logging.critical("CRITICAL: Payment refund failed for user %s amount %.2f", user_id, total_amount)
+        
+        raise HTTPException(
+            status_code=500, 
+            detail='A critical error occurred while finalizing the purchase. Your payment will be refunded.'
+        )
+
+
+def simulate_payment(amount: float) -> bool:
+    """Simulate payment processing. Replace with real payment gateway (Stripe, PayPal, etc.)."""
+    logging.info("Simulating payment of %.2f", amount)
+    # In production: call payment gateway API here
+    # For now, always succeed
+    return True
+
+
+def refund_payment(user_id: str, amount: float) -> bool:
+    """Simulate payment refund. Replace with real payment gateway refund API."""
+    logging.warning("Simulating payment refund of %.2f for user %s", amount, user_id)
+    # In production: call payment gateway refund API here
+    # For now, always succeed
+    return True
 
 @app.get('/tokens', response_model=List[TourPurchaseToken])
 def get_tokens(current_user: str = Depends(get_current_user)):

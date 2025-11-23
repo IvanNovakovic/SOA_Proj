@@ -31,6 +31,7 @@ type createTourRequest struct {
     Description string   `json:"description"`
     Difficulty  string   `json:"difficulty"`
     Tags        []string `json:"tags"`
+    Status      string   `json:"status"`
 }
 
 func createTour(repo tourRepo) http.HandlerFunc {
@@ -57,6 +58,7 @@ func createTour(repo tourRepo) http.HandlerFunc {
             Description: req.Description,
             Difficulty:  req.Difficulty,
             Tags:        req.Tags,
+            Status:      req.Status,
         }
         ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
         defer cancel()
