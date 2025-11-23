@@ -1,0 +1,28 @@
+meta {
+  name: add to cart
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://localhost:8086/cart/items
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiI2OTE3NTE4ODQ0ZDFlODk4NTQzMjBkYTAiLCJ1c2VybmFtZSI6ImtpdG9tYmVyIiwicm9sZXMiOlsidXNlciJdLCJhdWQiOlsiIl0sImV4cCI6MTc2MzkyNTc4NSwibmJmIjoxNzYzOTIyMTg1LCJpYXQiOjE3NjM5MjIxODV9.Yn7lOIr_om9bUgCFYTCJsKTKdxiK8BpTz68dy_h-KPo
+}
+
+body:json {
+    {
+      "tour_id": "69234b1e0456a80302678160",
+      "name": "Sunset Hike",
+      "price": 29.99
+    }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

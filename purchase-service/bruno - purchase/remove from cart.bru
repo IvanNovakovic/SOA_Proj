@@ -1,0 +1,20 @@
+meta {
+  name: remove from cart
+  type: http
+  seq: 2
+}
+
+delete {
+  url: http://localhost:8086/cart/items/c4007777-4adb-4528-8c9d-6787296e04f1
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiI2OTE3NTE4ODQ0ZDFlODk4NTQzMjBkYTAiLCJ1c2VybmFtZSI6ImtpdG9tYmVyIiwicm9sZXMiOlsidXNlciJdLCJhdWQiOlsiIl0sImV4cCI6MTc2MzkyNTc4NSwibmJmIjoxNzYzOTIyMTg1LCJpYXQiOjE3NjM5MjIxODV9.Yn7lOIr_om9bUgCFYTCJsKTKdxiK8BpTz68dy_h-KPo
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

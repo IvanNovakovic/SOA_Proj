@@ -138,6 +138,29 @@ services:
       options:
         tag: "gateway-service"
 
+  purchase-service:
+    build:
+      context: ./purchase-service
+      dockerfile: Dockerfile
+    container_name: purchase-service
+    depends_on:
+      - mongo
+      - tour-service
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
+      - TOUR_DB=tours
+      - PURCHASE_DB=purchases
+      - TOUR_SERVICE_BASE=http://tour-service:8083
+      - JWT_SECRET=dev-secret-change-me
+      - JWT_ALGORITHM=HS256
+    ports:
+      - "8086:8086"
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        tag: "purchase-service"
+
   # Monitoring Stack
   prometheus:
     image: prom/prometheus:latest
