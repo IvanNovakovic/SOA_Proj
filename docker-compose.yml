@@ -216,6 +216,19 @@ services:
       - loki-data:/loki
     restart: unless-stopped
 
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: promtail
+    ports:
+      - "9080:9080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+
   fluent-bit:
     image: fluent/fluent-bit:latest
     container_name: fluent-bit
