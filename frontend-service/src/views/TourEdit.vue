@@ -82,6 +82,43 @@
           </div>
         </div>
 
+        <div class="form-group">
+          <label>Transport Durations (minutes)</label>
+          <p class="field-note">Set at least one duration to publish the tour</p>
+          <div class="durations-grid">
+            <div class="duration-input">
+              <label for="walking">🚶 Walking</label>
+              <input 
+                id="walking"
+                v-model.number="form.durations.walking" 
+                type="number" 
+                min="0"
+                placeholder="0"
+              />
+            </div>
+            <div class="duration-input">
+              <label for="biking">🚴 Biking</label>
+              <input 
+                id="biking"
+                v-model.number="form.durations.biking" 
+                type="number" 
+                min="0"
+                placeholder="0"
+              />
+            </div>
+            <div class="duration-input">
+              <label for="driving">🚗 Driving</label>
+              <input 
+                id="driving"
+                v-model.number="form.durations.driving" 
+                type="number" 
+                min="0"
+                placeholder="0"
+              />
+            </div>
+          </div>
+        </div>
+
         <div class="form-actions">
           <button type="submit" :disabled="saving" class="btn-primary">
             {{ saving ? 'Saving...' : 'Save Changes' }}
@@ -111,7 +148,12 @@ export default {
       difficulty: '',
       tags: [],
       status: 'draft',
-      price: 0
+      price: 0,
+      durations: {
+        walking: 0,
+        biking: 0,
+        driving: 0
+      }
     })
     const tagInput = ref('')
     const loading = ref(true)
@@ -132,7 +174,8 @@ export default {
           difficulty: tour.difficulty,
           tags: tour.tags || [],
           status: tour.status,
-          price: tour.price
+          price: tour.price,
+          durations: tour.durations || { walking: 0, biking: 0, driving: 0 }
         }
       } catch (err) {
         loadError.value = err.response?.data?.error || err.message || 'Failed to load tour'
@@ -165,7 +208,8 @@ export default {
           difficulty: form.value.difficulty,
           tags: form.value.tags,
           status: form.value.status,
-          price: form.value.price
+          price: form.value.price,
+          durations: form.value.durations
         }
 
         await api.updateTour(tourId, tourData)
@@ -320,6 +364,39 @@ textarea {
 
 .remove-tag:hover {
   color: #c33;
+}
+
+.durations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.duration-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.duration-input label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.duration-input input {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+.field-note {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 0.25rem 0 0 0;
+  font-style: italic;
 }
 
 .form-actions {

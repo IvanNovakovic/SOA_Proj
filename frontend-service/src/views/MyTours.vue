@@ -39,9 +39,6 @@
         <div class="tour-actions">
           <router-link :to="`/tours/${tour.id}`" class="btn-view">View Details</router-link>
           <router-link :to="`/tours/${tour.id}/edit`" class="btn-edit">Edit Tour</router-link>
-          <router-link :to="`/tours/${tour.id}/keypoints/create`" class="btn-keypoints">
-            Add Key Points
-          </router-link>
         </div>
 
         <div class="tour-date">

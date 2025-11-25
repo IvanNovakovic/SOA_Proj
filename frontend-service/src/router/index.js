@@ -69,9 +69,26 @@ const routes = [
     component: () => import('../views/TourDetail.vue')
   },
   {
+    path: '/tours/:id/map',
+    name: 'TourMapView',
+    component: () => import('../views/TourMapView.vue')
+  },
+  {
+    path: '/position-simulator',
+    name: 'PositionSimulator',
+    component: () => import('../views/PositionSimulator.vue'),
+    meta: { requiresAuth: true, requiresTourist: true }
+  },
+  {
     path: '/tours/:tourId/keypoints/create',
     name: 'KeyPointCreate',
     component: () => import('../views/KeyPointCreate.vue'),
+    meta: { requiresAuth: true, requiresGuide: true }
+  },
+  {
+    path: '/tours/:tourId/keypoints/manage',
+    name: 'KeyPointManage',
+    component: () => import('../views/KeyPointManage.vue'),
     meta: { requiresAuth: true, requiresGuide: true }
   },
   {

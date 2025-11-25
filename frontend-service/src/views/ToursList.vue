@@ -13,7 +13,7 @@
       <h2>No Tours Available</h2>
       <p>Tours from guides you follow will appear here.</p>
       <p class="hint">Start by following some guides to discover their amazing tours!</p>
-      <router-link to="/discover" class="btn-primary">
+      <router-link to="/recommendations" class="btn-primary">
         <span>🔍</span> Discover Guides
       </router-link>
     </div>
@@ -57,6 +57,22 @@
                   <span class="icon">💰</span>
                   <strong>Price:</strong> ${{ tour.price?.toFixed(2) || '0.00' }}
                 </span>
+              </div>
+              <div v-if="(tour.distance > 0) || (tour.durations && hasDurations(tour.durations))" class="meta-row travel-times-row">
+                <div class="travel-times-compact">
+                  <span v-if="tour.distance > 0" class="travel-time-compact distance-badge">
+                    📏 {{ tour.distance.toFixed(2) }} km
+                  </span>
+                  <span v-if="tour.durations && tour.durations.walking > 0" class="travel-time-compact">
+                    🚶 {{ formatDuration(tour.durations.walking) }}
+                  </span>
+                  <span v-if="tour.durations && tour.durations.biking > 0" class="travel-time-compact">
+                    🚴 {{ formatDuration(tour.durations.biking) }}
+                  </span>
+                  <span v-if="tour.durations && tour.durations.driving > 0" class="travel-time-compact">
+                    🚗 {{ formatDuration(tour.durations.driving) }}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -180,10 +196,25 @@ export default {
       fetchToursFromFollowing()
     })
 
+    const formatDuration = (minutes) => {
+      if (!minutes || minutes === 0) return ''
+      const hours = Math.floor(minutes / 60)
+      const mins = minutes % 60
+      if (hours === 0) return `${mins} min`
+      if (mins === 0) return `${hours}h`
+      return `${hours}h ${mins}min`
+    }
+
+    const hasDurations = (durations) => {
+      return durations && (durations.walking > 0 || durations.biking > 0 || durations.driving > 0)
+    }
+
     return {
       tours,
       loading,
-      error
+      error,
+      formatDuration,
+      hasDurations
     }
   }
 }
@@ -432,6 +463,36 @@ export default {
 .meta-item strong {
   color: #333;
   margin-right: 0.25rem;
+}
+
+.travel-times-row {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e9ecef;
+}
+
+.travel-times-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.travel-time-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  background: #f8f9fa;
+  border-radius: 12px;
+  color: #495057;
+  font-weight: 500;
+}
+
+.travel-time-compact.distance-badge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
 }
 
 .difficulty-badge {

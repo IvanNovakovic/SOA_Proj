@@ -63,6 +63,43 @@
         </div>
       </div>
 
+      <div class="form-group">
+        <label>Transport Durations (minutes)</label>
+        <p class="field-note">Set at least one duration to publish the tour</p>
+        <div class="durations-grid">
+          <div class="duration-input">
+            <label for="walking">🚶 Walking</label>
+            <input 
+              id="walking"
+              v-model.number="form.durations.walking" 
+              type="number" 
+              min="0"
+              placeholder="0"
+            />
+          </div>
+          <div class="duration-input">
+            <label for="biking">🚴 Biking</label>
+            <input 
+              id="biking"
+              v-model.number="form.durations.biking" 
+              type="number" 
+              min="0"
+              placeholder="0"
+            />
+          </div>
+          <div class="duration-input">
+            <label for="driving">🚗 Driving</label>
+            <input 
+              id="driving"
+              v-model.number="form.durations.driving" 
+              type="number" 
+              min="0"
+              placeholder="0"
+            />
+          </div>
+        </div>
+      </div>
+
       <div class="form-actions">
         <button type="submit" :disabled="loading" class="btn-primary">
           {{ loading ? 'Creating...' : 'Create Tour (Draft)' }}
@@ -93,7 +130,12 @@ export default {
       name: '',
       description: '',
       difficulty: '',
-      tags: []
+      tags: [],
+      durations: {
+        walking: 0,
+        biking: 0,
+        driving: 0
+      }
     })
     const tagInput = ref('')
     const loading = ref(false)
@@ -123,7 +165,8 @@ export default {
           description: form.value.description,
           difficulty: form.value.difficulty,
           tags: form.value.tags,
-          status: 'draft'
+          status: 'draft',
+          durations: form.value.durations
         }
 
         const createdTour = await api.createTour(tourData)
@@ -266,6 +309,39 @@ h1 {
 
 .remove-tag:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+.durations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.duration-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.duration-input label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.duration-input input {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+.field-note {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 0.25rem 0 0 0;
+  font-style: italic;
 }
 
 .form-actions {

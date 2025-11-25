@@ -135,7 +135,8 @@ func (r *TourRepository) CreateKeyPoint(ctx context.Context, kp *model.KeyPoint)
 
 func (r *TourRepository) GetKeyPointsByTour(ctx context.Context, tourId primitive.ObjectID) ([]model.KeyPoint, error) {
 	filter := bson.M{"tourId": tourId}
-	cur, err := r.kpCol.Find(ctx, filter)
+	opts := options.Find().SetSort(bson.D{{Key: "order", Value: 1}, {Key: "createdAt", Value: 1}})
+	cur, err := r.kpCol.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -149,6 +150,52 @@ func (r *TourRepository) GetKeyPointsByTour(ctx context.Context, tourId primitiv
 		kps = append(kps, kp)
 	}
 	return kps, nil
+}
+
+func (r *TourRepository) UpdateKeyPoint(ctx context.Context, keypointId string, updates map[string]interface{}) (*model.KeyPoint, error) {
+	objID, err := primitive.ObjectIDFromHex(keypointId)
+	if err != nil {
+		return nil, err
+	}
+	filter := bson.M{"_id": objID}
+	// Prevent updating certain fields
+	delete(updates, "_id")
+	delete(updates, "tourId")
+	delete(updates, "createdAt")
+
+	update := bson.M{"$set": updates}
+	var kp model.KeyPoint
+	err = r.kpCol.FindOneAndUpdate(ctx, filter, update, options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(&kp)
+	if err != nil {
+		return nil, err
+	}
+	return &kp, nil
+}
+
+func (r *TourRepository) DeleteKeyPoint(ctx context.Context, keypointId string) error {
+	objID, err := primitive.ObjectIDFromHex(keypointId)
+	if err != nil {
+		return err
+	}
+	_, err = r.kpCol.DeleteOne(ctx, bson.M{"_id": objID})
+	return err
+}
+
+func (r *TourRepository) UpdateKeyPointsOrder(ctx context.Context, tourId primitive.ObjectID, orderedIds []string) error {
+	// Update each keypoint with its new order
+	for i, idStr := range orderedIds {
+		objID, err := primitive.ObjectIDFromHex(idStr)
+		if err != nil {
+			continue
+		}
+		filter := bson.M{"_id": objID, "tourId": tourId}
+		update := bson.M{"$set": bson.M{"order": i}}
+		_, err = r.kpCol.UpdateOne(ctx, filter, update)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Review methods
@@ -187,4 +234,73 @@ func (r *TourRepository) GetReviewsByTour(ctx context.Context, tourId primitive.
 		out = append(out, rev)
 	}
 	return out, nil
+}
+
+func (r *TourRepository) PublishTour(ctx context.Context, tourId string, authorId string) (*model.Tour, error) {
+	objID, err := primitive.ObjectIDFromHex(tourId)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	filter := bson.M{"_id": objID, "authorId": authorId}
+	update := bson.M{
+		"$set": bson.M{
+			"status":      "published",
+			"publishedAt": now,
+			"archivedAt":  nil,
+		},
+	}
+
+	var tour model.Tour
+	err = r.col.FindOneAndUpdate(ctx, filter, update, options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(&tour)
+	if err != nil {
+		return nil, err
+	}
+	return &tour, nil
+}
+
+func (r *TourRepository) ArchiveTour(ctx context.Context, tourId string, authorId string) (*model.Tour, error) {
+	objID, err := primitive.ObjectIDFromHex(tourId)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	filter := bson.M{"_id": objID, "authorId": authorId, "status": "published"}
+	update := bson.M{
+		"$set": bson.M{
+			"status":     "archived",
+			"archivedAt": now,
+		},
+	}
+
+	var tour model.Tour
+	err = r.col.FindOneAndUpdate(ctx, filter, update, options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(&tour)
+	if err != nil {
+		return nil, err
+	}
+	return &tour, nil
+}
+
+func (r *TourRepository) ActivateTour(ctx context.Context, tourId string, authorId string) (*model.Tour, error) {
+	objID, err := primitive.ObjectIDFromHex(tourId)
+	if err != nil {
+		return nil, err
+	}
+
+	filter := bson.M{"_id": objID, "authorId": authorId, "status": "archived"}
+	update := bson.M{
+		"$set": bson.M{
+			"status":     "published",
+			"archivedAt": nil,
+		},
+	}
+
+	var tour model.Tour
+	err = r.col.FindOneAndUpdate(ctx, filter, update, options.FindOneAndUpdate().SetReturnDocument(options.After)).Decode(&tour)
+	if err != nil {
+		return nil, err
+	}
+	return &tour, nil
 }

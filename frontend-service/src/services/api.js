@@ -112,6 +112,21 @@ export const api = {
     return response.data
   },
 
+  async publishTour(id) {
+    const response = await apiClient.post(`/tours/${id}/publish`)
+    return response.data
+  },
+
+  async archiveTour(id) {
+    const response = await apiClient.post(`/tours/${id}/archive`)
+    return response.data
+  },
+
+  async activateTour(id) {
+    const response = await apiClient.post(`/tours/${id}/activate`)
+    return response.data
+  },
+
   // KeyPoints endpoints
   async getKeyPoints(tourId) {
     const response = await apiClient.get(`/tours/${tourId}/keypoints`)
@@ -120,6 +135,21 @@ export const api = {
 
   async createKeyPoint(tourId, keyPointData) {
     const response = await apiClient.post(`/tours/${tourId}/keypoints`, keyPointData)
+    return response.data
+  },
+
+  async updateKeyPoint(keypointId, keyPointData) {
+    const response = await apiClient.put(`/keypoints/${keypointId}`, keyPointData)
+    return response.data
+  },
+
+  async deleteKeyPoint(keypointId) {
+    const response = await apiClient.delete(`/keypoints/${keypointId}`)
+    return response.data
+  },
+
+  async reorderKeyPoints(tourId, keypointIds) {
+    const response = await apiClient.put(`/tours/${tourId}/keypoints/reorder`, { keypointIds })
     return response.data
   },
 

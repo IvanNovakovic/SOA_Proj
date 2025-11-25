@@ -14,6 +14,33 @@
             <span class="price">Price: ${{ tour.price }}</span>
           </div>
         </div>
+        <!-- Author Actions -->
+        <div v-if="isAuthor" class="author-actions">
+          <button 
+            v-if="tour.status === 'draft'" 
+            @click="publishTour" 
+            :disabled="publishing"
+            class="btn-action btn-publish"
+          >
+            {{ publishing ? 'Publishing...' : '📢 Publish Tour' }}
+          </button>
+          <button 
+            v-if="tour.status === 'published'" 
+            @click="archiveTour" 
+            :disabled="archiving"
+            class="btn-action btn-archive"
+          >
+            {{ archiving ? 'Archiving...' : '📦 Archive Tour' }}
+          </button>
+          <button 
+            v-if="tour.status === 'archived'" 
+            @click="activateTour" 
+            :disabled="activating"
+            class="btn-action btn-activate"
+          >
+            {{ activating ? 'Activating...' : '✅ Activate Tour' }}
+          </button>
+        </div>
       </div>
 
       <!-- Tour Description -->
@@ -30,26 +57,81 @@
         </div>
       </div>
 
+      <!-- Travel Times & Distance -->
+      <div v-if="(tour.distance > 0) || (tour.durations && (tour.durations.walking > 0 || tour.durations.biking > 0 || tour.durations.driving > 0))" class="tour-travel-times">
+        <h3>Tour Information</h3>
+        <div class="travel-times-grid">
+          <div v-if="tour.distance > 0" class="travel-time-card distance-card">
+            <span class="travel-icon">📏</span>
+            <span class="travel-label">Distance</span>
+            <span class="travel-value">{{ tour.distance.toFixed(2) }} km</span>
+          </div>
+          <div v-if="tour.durations.walking > 0" class="travel-time-card">
+            <span class="travel-icon">🚶</span>
+            <span class="travel-label">Walking</span>
+            <span class="travel-value">{{ formatDuration(tour.durations.walking) }}</span>
+          </div>
+          <div v-if="tour.durations.biking > 0" class="travel-time-card">
+            <span class="travel-icon">🚴</span>
+            <span class="travel-label">Biking</span>
+            <span class="travel-value">{{ formatDuration(tour.durations.biking) }}</span>
+          </div>
+          <div v-if="tour.durations.driving > 0" class="travel-time-card">
+            <span class="travel-icon">🚗</span>
+            <span class="travel-label">Driving</span>
+            <span class="travel-value">{{ formatDuration(tour.durations.driving) }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Key Points Section -->
       <div class="section keypoints-section">
         <div class="section-header">
           <h2>Key Points</h2>
-          <router-link 
-            v-if="isAuthor" 
-            :to="`/tours/${tour.id}/keypoints/create`" 
-            class="btn-add"
-          >
-            + Add Key Point
-          </router-link>
+          <div class="header-actions">
+            <router-link 
+              v-if="keyPoints.length > 0"
+              :to="`/tours/${tour.id}/map`" 
+              class="btn-view-map"
+            >
+              🗺️ View Route Map
+            </router-link>
+            <router-link 
+              v-if="isAuthor"
+              :to="`/tours/${tour.id}/keypoints/manage`" 
+              class="btn-manage"
+            >
+              ⚙️ Manage Points
+            </router-link>
+          </div>
         </div>
 
         <div v-if="loadingKeyPoints" class="loading-small">Loading key points...</div>
         <div v-else-if="keyPoints.length === 0" class="empty-message">
-          No key points added yet.
+          <p>No key points added yet.</p>
+          <router-link 
+            v-if="isAuthor" 
+            :to="`/tours/${tour.id}/keypoints/manage`" 
+            class="btn-add-inline"
+          >
+            + Add Your First Point
+          </router-link>
         </div>
         <div v-else class="keypoints-grid">
-          <div v-for="kp in keyPoints" :key="kp.id" class="keypoint-card">
-            <img v-if="kp.imageUrl" :src="kp.imageUrl" :alt="kp.name" class="keypoint-image" />
+          <div v-for="(kp, index) in keyPoints" :key="kp.id" class="keypoint-card">
+            <div class="keypoint-number">{{ index + 1 }}</div>
+            <div class="keypoint-image-container">
+              <img 
+                v-if="kp.imageUrl" 
+                :src="kp.imageUrl" 
+                :alt="kp.name" 
+                class="keypoint-image"
+                @error="handleImageError"
+              />
+              <div v-else class="keypoint-image-placeholder">
+                <span class="placeholder-icon">🏞️</span>
+              </div>
+            </div>
             <div class="keypoint-content">
               <h3>{{ kp.name }}</h3>
               <p v-if="kp.description">{{ kp.description }}</p>
@@ -186,7 +268,8 @@ export default {
       description: '',
       status: '',
       difficulty: '',
-      price: 0
+      price: 0,
+      durations: { walking: 0, biking: 0, driving: 0 }
     })
     const keyPoints = ref([])
     const reviews = ref([])
@@ -195,6 +278,9 @@ export default {
     const loadingKeyPoints = ref(false)
     const loadingReviews = ref(false)
     const error = ref('')
+    const publishing = ref(false)
+    const archiving = ref(false)
+    const activating = ref(false)
     
     const showReviewForm = ref(false)
     const reviewLoading = ref(false)
@@ -311,6 +397,74 @@ export default {
       })
     }
 
+    const handleImageError = (event) => {
+      event.target.style.display = 'none'
+      const placeholder = event.target.nextElementSibling
+      if (placeholder && placeholder.classList.contains('keypoint-image-placeholder')) {
+        placeholder.style.display = 'flex'
+      }
+    }
+
+    const formatDuration = (minutes) => {
+      if (!minutes || minutes === 0) return ''
+      const hours = Math.floor(minutes / 60)
+      const mins = minutes % 60
+      if (hours === 0) return `${mins} min`
+      if (mins === 0) return `${hours}h`
+      return `${hours}h ${mins}min`
+    }
+
+    const publishTour = async () => {
+      if (!confirm('Are you sure you want to publish this tour? Make sure you have at least 2 keypoints and 1 duration set.')) {
+        return
+      }
+
+      publishing.value = true
+      try {
+        await api.publishTour(tourId)
+        alert('Tour published successfully!')
+        await fetchTour() // Reload to get updated status
+      } catch (err) {
+        alert(err.response?.data?.error || err.message || 'Failed to publish tour')
+      } finally {
+        publishing.value = false
+      }
+    }
+
+    const archiveTour = async () => {
+      if (!confirm('Are you sure you want to archive this tour? It will no longer be visible to tourists.')) {
+        return
+      }
+
+      archiving.value = true
+      try {
+        await api.archiveTour(tourId)
+        alert('Tour archived successfully!')
+        await fetchTour()
+      } catch (err) {
+        alert(err.response?.data?.error || err.message || 'Failed to archive tour')
+      } finally {
+        archiving.value = false
+      }
+    }
+
+    const activateTour = async () => {
+      if (!confirm('Are you sure you want to reactivate this tour?')) {
+        return
+      }
+
+      activating.value = true
+      try {
+        await api.activateTour(tourId)
+        alert('Tour activated successfully!')
+        await fetchTour()
+      } catch (err) {
+        alert(err.response?.data?.error || err.message || 'Failed to activate tour')
+      } finally {
+        activating.value = false
+      }
+    }
+
     onMounted(async () => {
       await fetchTour()
       fetchKeyPoints()
@@ -325,6 +479,9 @@ export default {
       loadingKeyPoints,
       loadingReviews,
       error,
+      publishing,
+      archiving,
+      activating,
       isAuthor,
       canAddReview,
       showReviewForm,
@@ -334,7 +491,12 @@ export default {
       today,
       submitReview,
       cancelReview,
-      formatDate
+      formatDate,
+      formatDuration,
+      handleImageError,
+      publishTour,
+      archiveTour,
+      activateTour
     }
   }
 }
@@ -400,6 +562,68 @@ export default {
   color: #4caf50;
 }
 
+.status-badge.archived {
+  background: #eeeeee;
+  color: #757575;
+}
+
+.tour-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.author-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn-action {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-publish {
+  background: #4caf50;
+  color: white;
+}
+
+.btn-publish:hover:not(:disabled) {
+  background: #45a049;
+}
+
+.btn-archive {
+  background: #ff9800;
+  color: white;
+}
+
+.btn-archive:hover:not(:disabled) {
+  background: #fb8c00;
+}
+
+.btn-activate {
+  background: #2196f3;
+  color: white;
+}
+
+.btn-activate:hover:not(:disabled) {
+  background: #1976d2;
+}
+
 .difficulty,
 .price {
   color: #666;
@@ -447,6 +671,61 @@ export default {
   font-size: 0.9rem;
 }
 
+.tour-travel-times {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.tour-travel-times h3 {
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.travel-times-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.travel-time-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.travel-time-card .travel-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.travel-time-card .travel-label {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 0.25rem;
+}
+
+.travel-time-card .travel-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.travel-time-card.distance-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.travel-time-card.distance-card .travel-label,
+.travel-time-card.distance-card .travel-value {
+  color: white;
+}
+
 .section {
   background: white;
   padding: 2rem;
@@ -467,7 +746,14 @@ export default {
   margin: 0;
 }
 
-.btn-add {
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-add,
+.btn-manage,
+.btn-view-map {
   background: #42b983;
   color: white;
   padding: 0.6rem 1.2rem;
@@ -477,17 +763,52 @@ export default {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.btn-add:hover {
+.btn-view-map {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.btn-add:hover,
+.btn-manage:hover {
   background: #35a372;
+  transform: translateY(-1px);
+}
+
+.btn-view-map:hover {
+  background: linear-gradient(135deg, #5568d3 0%, #65408e 100%);
+  transform: translateY(-1px);
+}
+
+.btn-add-inline {
+  background: linear-gradient(135deg, #42b983 0%, #35a372 100%);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  display: inline-block;
+  margin-top: 1rem;
+  transition: all 0.2s;
+}
+
+.btn-add-inline:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(66, 185, 131, 0.3);
 }
 
 .empty-message {
   text-align: center;
   color: #999;
   padding: 2rem;
+}
+
+.empty-message p {
   font-style: italic;
+  margin-bottom: 0.5rem;
 }
 
 .keypoints-grid {
@@ -497,21 +818,63 @@ export default {
 }
 
 .keypoint-card {
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
   overflow: hidden;
   transition: all 0.2s;
+  position: relative;
 }
 
 .keypoint-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   border-color: #42b983;
+  transform: translateY(-2px);
+}
+
+.keypoint-number {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+
+.keypoint-image-container {
+  width: 100%;
+  height: 200px;
+  position: relative;
+  overflow: hidden;
 }
 
 .keypoint-image {
   width: 100%;
-  height: 200px;
+  height: 100%;
   object-fit: cover;
+  display: block;
+}
+
+.keypoint-image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e0e0e0 0%, #f5f5f5 100%);
+}
+
+.placeholder-icon {
+  font-size: 4rem;
+  opacity: 0.5;
 }
 
 .keypoint-content {
