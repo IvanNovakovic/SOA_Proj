@@ -3,6 +3,9 @@ import Home from '../views/Home.vue'
 import Login from '../views/Login.vue'
 import Register from '../views/Register.vue'
 import { authService } from '../services/auth'
+import SeeCart from '../views/SeeCart.vue'
+import PurchasedTours from '../views/PurchasedTours.vue'
+import PurchasedTourDetail from '../views/PurchasedTourDetail.vue'
 
 const routes = [
   {
@@ -125,7 +128,23 @@ const routes = [
     name: 'FollowRecommendations',
     component: () => import('../views/FollowRecommendations.vue'),
     meta: { requiresAuth: true }
-  }
+  },
+  { path: '/cart', 
+    name: 'Cart', 
+    component: SeeCart 
+  },
+  {
+    path: '/purchased-tours',
+    name: 'PurchasedTours',
+    component: PurchasedTours
+  },
+  {
+    path: '/purchased-tour-detail/:id',
+    name: 'PurchasedTourDetail',
+    component: PurchasedTourDetail,
+    props: true 
+  },
+
 ]
 
 const router = createRouter({

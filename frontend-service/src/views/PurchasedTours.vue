@@ -2,7 +2,7 @@
   <div class="tours-list">
     <div v-if="loading" class="loading">
       <div class="spinner"></div>
-      <p>Loading tours...</p>
+      <p>Loading purchased tours...</p>
     </div>
     <div v-else-if="error" class="error-message">
       <span class="error-icon">⚠️</span>
@@ -10,18 +10,18 @@
     </div>
     <div v-else-if="tours.length === 0" class="empty-state">
       <div class="empty-icon">🗺️</div>
-      <h2>No Tours Available</h2>
-      <p>Tours from guides you follow will appear here.</p>
-      <p class="hint">Start by following some guides to discover their amazing tours!</p>
-      <router-link to="/recommendations" class="btn-primary">
-        <span>🔍</span> Discover Guides
+      <h2>No Purchased Tours</h2>
+      <p>You haven't purchased any tours yet.</p>
+      <p class="hint">Discover amazing tours and add them to your cart!</p>
+      <router-link to="/tours" class="btn-primary">
+        <span>🔍</span> Discover Tours
       </router-link>
     </div>
 
     <div v-else>
       <div class="tours-header">
-        <h2>Discover Tours</h2>
-        <p class="tours-count">{{ tours.length }} tour{{ tours.length !== 1 ? 's' : '' }} available</p>
+        <h2>My Purchased Tours</h2>
+        <p class="tours-count">{{ tours.length }} tour{{ tours.length !== 1 ? 's' : '' }} purchased</p>
       </div>
       
       <div class="tours-grid">
@@ -33,7 +33,7 @@
           <div class="tour-content">
             <div class="tour-header">
               <h3>{{ tour.name }}</h3>
-              <span class="status-badge published">Published</span>
+              <span class="status-badge purchased">Purchased</span>
             </div>
             
             <p v-if="tour.description" class="tour-description">{{ tour.description }}</p>
@@ -63,13 +63,13 @@
                   <span v-if="tour.distance > 0" class="travel-time-compact distance-badge">
                     📏 {{ tour.distance.toFixed(2) }} km
                   </span>
-                  <span v-if="tour.durations && tour.durations.walking > 0" class="travel-time-compact">
+                  <span v-if="tour.durations?.walking > 0" class="travel-time-compact">
                     🚶 {{ formatDuration(tour.durations.walking) }}
                   </span>
-                  <span v-if="tour.durations && tour.durations.biking > 0" class="travel-time-compact">
+                  <span v-if="tour.durations?.biking > 0" class="travel-time-compact">
                     🚴 {{ formatDuration(tour.durations.biking) }}
                   </span>
-                  <span v-if="tour.durations && tour.durations.driving > 0" class="travel-time-compact">
+                  <span v-if="tour.durations?.driving > 0" class="travel-time-compact">
                     🚗 {{ formatDuration(tour.durations.driving) }}
                   </span>
                 </div>
@@ -86,18 +86,9 @@
             </div>
 
             <div class="tour-footer">
-              <router-link :to="`/tours/${tour.id}`" class="btn-view">
+              <router-link :to="`/purchased-tour-detail/${tour.id}`" class="btn-view">
                 View Details →
               </router-link>
-
-             <button 
-              class="btn-addToCart" 
-              @click="addToCart(tour)" 
-              :disabled="addedToCart.has(tour.id)"
-            >
-              {{ addedToCart.has(tour.id) ? 'Added' : 'Add to Cart' }}
-            </button>
-
             </div>
           </div>
         </div>
@@ -112,100 +103,63 @@ import { api } from '../services/api'
 import { authStore } from '../stores/authStore'
 
 export default {
-  name: 'ToursList',
+  name: 'PurchasedTours',
   setup() {
     const tours = ref([])
     const loading = ref(true)
     const error = ref('')
-    const addedToCart = ref(new Set())
 
-
-    const fetchToursFromFollowing = async () => {
+    const fetchPurchasedTours = async () => {
       loading.value = true
       error.value = ''
-      
+
       try {
         const userId = authStore.getUserId()
-        
-        // Get list of users the current user is following
-        const followingData = await api.getFollowing(userId)
-        console.log('Following data:', followingData)
-        
-        // Handle different response formats - it's an array of user IDs
-        let followingIds = []
-        if (Array.isArray(followingData)) {
-          // Check if it's an array of objects or array of strings
-          if (followingData.length > 0 && typeof followingData[0] === 'string') {
-            followingIds = followingData
-          } else if (followingData.length > 0 && typeof followingData[0] === 'object') {
-            followingIds = followingData.map(u => u.user_id || u.userId || u.id)
-          }
-        }
-        
-        if (!followingIds || followingIds.length === 0) {
+        const purchasedTokens = await api.getPurchasedTours(userId)
+
+        if (!purchasedTokens || purchasedTokens.length === 0) {
           tours.value = []
-          loading.value = false
           return
         }
 
-        console.log('Following user IDs:', followingIds)
-
-        // First, fetch usernames for all followed users
-        const usernameMap = new Map()
-        await Promise.all(
-          followingIds.map(async (userId) => {
+        const detailedTours = await Promise.all(
+          purchasedTokens.map(async (token) => {
             try {
-              const user = await api.getUserById(userId)
-              usernameMap.set(userId, user.username || 'Guide')
+              const tour = await api.getTourById(token.tour_id)
+
+              return {
+                ...tour,
+                authorName: tour.authorName || tour.author?.username || 'Guide',
+                difficulty: tour.difficulty || 'Not set',
+                price: tour.price || 0,
+                distance: tour.distance || 0,
+                durations: {
+                  walking: tour.durations?.walking || tour.tour_duration || 0,
+                  biking: tour.durations?.biking || 0,
+                  driving: tour.durations?.driving || 0
+                },
+                tags: tour.tags || [],
+                start_point: tour.start_point || tour.startLocation || 'Unknown',
+                token: token.token
+              }
             } catch (err) {
-              console.error(`Failed to fetch username for user ${userId}:`, err)
-              usernameMap.set(userId, 'Guide')
+              console.error(`Failed to fetch tour ${token.tour_id}:`, err)
+              return null
             }
           })
         )
 
-        // Fetch tours from each followed guide
-        const tourPromises = followingIds.map(async (followedUserId) => {
-          try {
-            console.log(`Fetching tours for user ${followedUserId}`)
-            const userTours = await api.getToursByAuthor(followedUserId)
-            console.log(`Tours for ${followedUserId}:`, userTours)
-            
-            // Filter only published tours and add the username
-            return (userTours || [])
-              .filter(tour => tour.status === 'published')
-              .map(tour => ({
-                ...tour,
-                authorName: usernameMap.get(tour.authorId) || 'Guide'
-              }))
-          } catch (err) {
-            console.error(`Failed to fetch tours for user ${followedUserId}:`, err)
-            return []
-          }
-        })
-
-        const allTours = await Promise.all(tourPromises)
-        console.log('All tours fetched:', allTours)
-        
-        // Flatten the array and sort by creation date
-        tours.value = allTours
-          .flat()
+        tours.value = detailedTours.filter(t => t !== null)
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        
-        console.log('Final tours:', tours.value)
-        
+
       } catch (err) {
-        console.error('Error fetching tours:', err)
-        error.value = err.response?.data?.error || err.message || 'Failed to load tours'
+        console.error('Error fetching purchased tours:', err)
+        error.value = err.response?.data?.error || err.message || 'Failed to load purchased tours'
         tours.value = []
       } finally {
         loading.value = false
       }
     }
-
-    onMounted(() => {
-      fetchToursFromFollowing()
-    })
 
     const formatDuration = (minutes) => {
       if (!minutes || minutes === 0) return ''
@@ -220,35 +174,16 @@ export default {
       return durations && (durations.walking > 0 || durations.biking > 0 || durations.driving > 0)
     }
 
-    const addToCart = async (tour) => {
-        if (addedToCart.value.has(tour.id)) return 
-
-        try {
-          const item = {
-            tour_id: tour.id,
-            name: tour.name,
-            price: tour.price || 0.0
-          }
-
-          await api.addToCart(item)
-
-          alert(`Tour "${tour.name}" added to your cart!`)
-          addedToCart.value.add(tour.id)
-
-        } catch (err) {
-          console.error('Failed to add tour to cart:', err)
-          alert(err.response?.data?.detail || err.message || 'Failed to add tour to cart')
-        }
-      }
+    onMounted(() => {
+      fetchPurchasedTours()
+    })
 
     return {
       tours,
       loading,
       error,
-      addedToCart,
       formatDuration,
-      hasDurations,
-      addToCart
+      hasDurations
     }
   }
 }
@@ -450,9 +385,16 @@ export default {
   align-self: flex-start;
 }
 
-.status-badge.published {
-  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-  color: #155724;
+.status-badge.purchased {
+  background: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%); /* mat zlatni gradijent */
+  color: #5C4000; 
+  border: 1px solid #A67C00; 
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 0.35rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  letter-spacing: 0.5px;
 }
 
 .tour-description {
@@ -618,29 +560,4 @@ export default {
     font-size: 1.2rem;
   }
 }
-
-.btn-addToCart {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.9rem 1.5rem;
-  background: linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%);
-  color: white;
-  border-radius: 10px;
-  border: none;
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s;
-  box-shadow: 0 2px 8px rgba(255, 126, 95, 0.3);
-  margin-top: 0.5rem;
-}
-
-.btn-addToCart:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(255, 126, 95, 0.4);
-}
-
 </style>

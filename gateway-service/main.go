@@ -225,6 +225,10 @@ func main() {
 		"/users":    "http://stakeholders-service:8080",
 		"/auth":     "http://stakeholders-service:8080",
 		"/register": "http://stakeholders-service:8080",
+
+		// purchase service
+		"/cart":   "http://purchase-service:8086",
+		"/tokens": "http://purchase-service:8086",
 	}
 
 	// build proxies per target to reuse

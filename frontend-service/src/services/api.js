@@ -245,7 +245,32 @@ export const api = {
     } catch {
       return false
     }
+  },
+
+  async addToCart(item) {
+    const response = await apiClient.post('/cart/items', item)
+    return response.data
+  },
+
+  async getCart() {
+    const response = await apiClient.get('/cart')
+    return response.data
+  },
+
+  async removeCartItem(itemId) {
+    const response = await apiClient.delete(`/cart/items/${itemId}`)
+    return response.data
+  },
+
+  async checkoutCart() {
+    const response = await apiClient.post('/cart/checkout')
+    return response.data
+  },
+  async getPurchasedTours() {
+    const response = await apiClient.get('/tokens')
+    return response.data
   }
+  
 }
 
 export default api
