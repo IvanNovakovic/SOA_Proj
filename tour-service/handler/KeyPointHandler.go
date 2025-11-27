@@ -21,6 +21,7 @@ type kpRepo interface {
 	DeleteKeyPoint(ctx context.Context, keypointId string) error
 	UpdateKeyPointsOrder(ctx context.Context, tourId primitive.ObjectID, orderedIds []string) error
 	GetTourByID(ctx context.Context, tourId string) (*model.Tour, error)
+	HasUserPurchasedTour(ctx context.Context, userId string, tourId string) (bool, error)
 }
 
 func RegisterKeyPointRoutes(public *mux.Router, authRouter *mux.Router, repo kpRepo) {
@@ -122,11 +123,23 @@ func listKeyPoints(repo kpRepo) http.HandlerFunc {
 		// Get user from JWT (optional - middleware sets it if token is present)
 		authCtx := auth.GetAuth(r)
 
-		// If tour is published and user is not the author, return only first keypoint
+		// If tour is published and user is not the author, check if they purchased the tour
 		if tour.Status == "published" {
 			if authCtx == nil || authCtx.UserID != tour.AuthorID {
-				// User is a tourist (not authenticated or not the author)
-				if len(kps) > 0 {
+				// User is not the author - check if they purchased the tour
+				hasPurchased := false
+				if authCtx != nil {
+					// Check if user has purchased this tour
+					purchased, err := repo.HasUserPurchasedTour(ctx, authCtx.UserID, tourIdStr)
+					if err != nil {
+						log.Println("error checking purchase status:", err)
+					} else {
+						hasPurchased = purchased
+					}
+				}
+
+				// If user hasn't purchased, return only first keypoint
+				if !hasPurchased && len(kps) > 0 {
 					kps = kps[:1] // Return only first keypoint
 				}
 			}

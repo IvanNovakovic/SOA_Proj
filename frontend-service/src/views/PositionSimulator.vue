@@ -13,6 +13,27 @@
     <div class="content">
       <div class="map-section">
         <div id="map" ref="mapContainer"></div>
+        
+        <!-- Nearby Keypoint Notification -->
+        <transition name="slide-up">
+          <div v-if="nearbyKeypoint" class="nearby-notification">
+            <div class="notification-header">
+              <div class="notification-icon">🎯</div>
+              <div class="notification-title">
+                <h4>Key Point Reached!</h4>
+                <span class="keypoint-number">Point #{{ nearbyKeypoint.index }}</span>
+              </div>
+              <button @click="closeNearbyNotification" class="close-btn">×</button>
+            </div>
+            <div class="notification-body">
+              <h3>{{ nearbyKeypoint.name }}</h3>
+              <p v-if="nearbyKeypoint.description">{{ nearbyKeypoint.description }}</p>
+              <div class="notification-footer">
+                <span class="distance-badge">📍 {{ nearbyKeypoint.distance }}m away</span>
+              </div>
+            </div>
+          </div>
+        </transition>
       </div>
 
       <div class="info-panel">
@@ -52,10 +73,12 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { api } from '../services/api'
+import routingService from '../services/routingService'
 
 export default {
   name: 'PositionSimulator',
@@ -63,15 +86,28 @@ export default {
     hideInstructions: {
       type: Boolean,
       default: false
+    },
+    tourId: {
+      type: String,
+      default: null
+    },
+    execution: {
+      type: Object,
+      default: null
     }
   },
-  setup(props) {
+  setup(props, { emit }) {
     const router = useRouter()
     const mapContainer = ref(null)
     const currentPosition = ref(null)
+    const keyPoints = ref([])
+    const nearbyKeypoint = ref(null)
+    const visitedKeypoints = ref(new Set())
 
     let map = null
     let marker = null
+    let keypointMarkers = []
+    let routeLine = null
 
     const initMap = () => {
       // Try to get stored position or default to Novi Sad
@@ -104,6 +140,154 @@ export default {
       map.on('click', (e) => {
         setPosition(e.latlng.lat, e.latlng.lng)
       })
+
+      // Fetch and display key points if tourId is provided
+      if (props.tourId) {
+        fetchKeyPoints()
+      }
+    }
+
+    const fetchKeyPoints = async () => {
+      try {
+        const data = await api.getKeyPoints(props.tourId)
+        keyPoints.value = data || []
+        displayKeyPoints()
+      } catch (err) {
+        console.error('Failed to fetch key points:', err)
+      }
+    }
+
+    const displayKeyPoints = () => {
+      // Clear existing keypoint markers
+      keypointMarkers.forEach(m => map.removeLayer(m))
+      keypointMarkers = []
+
+      if (keyPoints.value.length === 0) return
+
+      // Create markers for each keypoint
+      keyPoints.value.forEach((kp, index) => {
+        const keypointIcon = L.divIcon({
+          className: 'keypoint-marker',
+          html: `
+            <div class="keypoint-number-marker">
+              <span>${index + 1}</span>
+            </div>
+          `,
+          iconSize: [40, 40],
+          iconAnchor: [20, 20]
+        })
+
+        const keypointMarker = L.marker([kp.latitude, kp.longitude], { icon: keypointIcon })
+          .bindPopup(`
+            <div class="keypoint-popup">
+              <h4>${kp.name}</h4>
+              ${kp.description ? `<p>${kp.description}</p>` : ''}
+              <p class="coords"><strong>Coordinates:</strong><br>${kp.latitude.toFixed(4)}, ${kp.longitude.toFixed(4)}</p>
+            </div>
+          `)
+          .addTo(map)
+
+        keypointMarkers.push(keypointMarker)
+      })
+
+      // Fit map bounds to show all keypoints
+      if (keyPoints.value.length > 0) {
+        const bounds = L.latLngBounds(keyPoints.value.map(kp => [kp.latitude, kp.longitude]))
+        map.fitBounds(bounds, { padding: [50, 50] })
+      }
+    }
+
+    const getNextUncompletedKeyPoint = (executionData = null) => {
+      if (!keyPoints.value || keyPoints.value.length === 0) return null
+      
+      const execToUse = executionData || props.execution
+      if (!execToUse?.completedPoints) return keyPoints.value[0]
+
+      const completedIds = new Set(execToUse.completedPoints.map(cp => cp.keyPointId))
+      
+      // Find first uncompleted key point
+      for (const kp of keyPoints.value) {
+        if (!completedIds.has(kp.id)) {
+          return kp
+        }
+      }
+      
+      return null // All completed
+    }
+
+    const updateRouteToNextPoint = async (executionData = null) => {
+      // Remove existing route line
+      if (routeLine) {
+        try {
+          map.removeLayer(routeLine)
+        } catch (e) {
+          console.warn('Failed to remove route line:', e)
+        }
+        routeLine = null
+      }
+
+      if (!currentPosition.value) return
+
+      const nextPoint = getNextUncompletedKeyPoint(executionData)
+      if (!nextPoint) {
+        // No more points, don't draw a route
+        return
+      }
+
+      try {
+        // Calculate route using OpenRouteService
+        const coordinates = [
+          [currentPosition.value.lng, currentPosition.value.lat], // ORS uses [lng, lat]
+          [nextPoint.longitude, nextPoint.latitude]
+        ]
+
+        const routeData = await routingService.calculateRoute(coordinates, 'foot-walking')
+        
+        // Remove any existing route before adding new one
+        if (routeLine) {
+          try {
+            map.removeLayer(routeLine)
+          } catch (e) {
+            console.warn('Failed to remove previous route:', e)
+          }
+        }
+        
+        // Convert ORS coordinates [lng, lat] to Leaflet format [lat, lng]
+        const latlngs = routeData.geometry.map(coord => [coord[1], coord[0]])
+
+        routeLine = L.polyline(latlngs, {
+          color: '#667eea',
+          weight: 4,
+          opacity: 0.7,
+          lineJoin: 'round'
+        }).addTo(map)
+
+      } catch (error) {
+        console.error('Failed to calculate route, using straight line:', error)
+        
+        // Remove any existing route before adding fallback
+        if (routeLine) {
+          try {
+            map.removeLayer(routeLine)
+          } catch (e) {
+            console.warn('Failed to remove previous route:', e)
+          }
+        }
+        
+        // Fallback to straight line if routing fails
+        const latlngs = [
+          [currentPosition.value.lat, currentPosition.value.lng],
+          [nextPoint.latitude, nextPoint.longitude]
+        ]
+
+        routeLine = L.polyline(latlngs, {
+          color: '#667eea',
+          weight: 4,
+          opacity: 0.7,
+          dashArray: '10, 10',
+          lineJoin: 'round'
+        }).addTo(map)
+      }
     }
 
     const addMarker = (lat, lng) => {
@@ -133,7 +317,7 @@ export default {
         .addTo(map)
     }
 
-    const setPosition = (lat, lng) => {
+    const setPosition = async (lat, lng) => {
       const position = {
         lat,
         lng,
@@ -145,6 +329,74 @@ export default {
       
       addMarker(lat, lng)
       map.setView([lat, lng], map.getZoom())
+
+      // Update route to next key point
+      updateRouteToNextPoint()
+
+      // Send location to backend if execution is active
+      if (props.execution && props.execution.id) {
+        await sendLocationToBackend(lat, lng)
+      }
+    }
+
+    const sendLocationToBackend = async (lat, lng) => {
+      try {
+        // Get completed points before sending location
+        const beforeCompleted = new Set(props.execution.completedPoints?.map(cp => cp.keyPointId) || [])
+        
+        // Send location to backend
+        await api.addExecutionLocation(props.execution.id, { latitude: lat, longitude: lng })
+        
+        // Get updated execution to check for newly completed points
+        const updatedExec = await api.getActiveExecution(props.tourId)
+        
+        // Check for newly completed points
+        const afterCompleted = new Set(updatedExec.completedPoints?.map(cp => cp.keyPointId) || [])
+        
+        for (const kpId of afterCompleted) {
+          if (!beforeCompleted.has(kpId) && !visitedKeypoints.value.has(kpId)) {
+            // Find the key point that was just completed
+            const kpIndex = keyPoints.value.findIndex(kp => kp.id === kpId)
+            if (kpIndex !== -1) {
+              const kp = keyPoints.value[kpIndex]
+              visitedKeypoints.value.add(kpId)
+              
+              // Show notification
+              nearbyKeypoint.value = {
+                ...kp,
+                distance: 0,
+                index: kpIndex + 1
+              }
+
+              // Auto-open the marker popup
+              if (keypointMarkers[kpIndex]) {
+                keypointMarkers[kpIndex].openPopup()
+              }
+
+              // Clear after 10 seconds
+              setTimeout(() => {
+                if (nearbyKeypoint.value?.id === kpId) {
+                  nearbyKeypoint.value = null
+                }
+              }, 10000)
+
+              break // Only show one at a time
+            }
+          }
+        }
+        
+        // Emit update to parent
+        emit('update-location', updatedExec)
+        
+        // Update route to next uncompleted point with fresh execution data
+        await updateRouteToNextPoint(updatedExec)
+      } catch (err) {
+        console.error('Failed to send location:', err)
+      }
+    }
+
+    const closeNearbyNotification = () => {
+      nearbyKeypoint.value = null
     }
 
     const formatTime = (timestamp) => {
@@ -165,13 +417,21 @@ export default {
       }
     })
 
+    // Watch for changes in execution to update route
+    watch(() => props.execution, (newExec) => {
+      if (newExec && currentPosition.value && map) {
+        updateRouteToNextPoint()
+      }
+    }, { deep: true })
+
     return {
       mapContainer,
       currentPosition,
+      nearbyKeypoint,
       formatTime,
       goBack,
+      closeNearbyNotification,
       hideInstructions: props.hideInstructions
-
     }
   }
 }
@@ -233,14 +493,146 @@ export default {
 
 .map-section {
   flex: 1;
+  min-height: 500px;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  position: relative;
 }
 
 #map {
   width: 100%;
   height: 100%;
+  min-height: 500px;
+}
+
+/* Nearby Keypoint Notification */
+.nearby-notification {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  min-width: 400px;
+  max-width: 500px;
+  overflow: hidden;
+  animation: bounce-in 0.5s ease-out;
+}
+
+.notification-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.notification-icon {
+  font-size: 2rem;
+  animation: pulse-icon 2s ease-in-out infinite;
+}
+
+@keyframes pulse-icon {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.notification-title {
+  flex: 1;
+}
+
+.notification-title h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.keypoint-number {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.notification-body {
+  padding: 1.5rem;
+}
+
+.notification-body h3 {
+  margin: 0 0 0.75rem 0;
+  color: #2c3e50;
+  font-size: 1.25rem;
+}
+
+.notification-body p {
+  margin: 0 0 1rem 0;
+  color: #666;
+  line-height: 1.5;
+}
+
+.notification-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.distance-badge {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+@keyframes bounce-in {
+  0% {
+    transform: translateX(-50%) translateY(100px);
+    opacity: 0;
+  }
+  50% {
+    transform: translateX(-50%) translateY(-10px);
+  }
+  100% {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-up-enter-from {
+  transform: translateX(-50%) translateY(100px);
+  opacity: 0;
+}
+
+.slide-up-leave-to {
+  transform: translateX(-50%) translateY(100px);
+  opacity: 0;
 }
 
 .info-panel {
@@ -337,6 +729,11 @@ export default {
   border: none;
 }
 
+:deep(.route-arrow) {
+  background: transparent;
+  border: none;
+}
+
 :deep(.marker-pulse) {
   width: 30px;
   height: 30px;
@@ -387,6 +784,51 @@ export default {
   margin: 0.25rem 0;
   color: #666;
   font-size: 0.9rem;
+}
+
+:deep(.keypoint-marker) {
+  background: transparent;
+  border: none;
+}
+
+:deep(.keypoint-number-marker) {
+  width: 40px;
+  height: 40px;
+  background: #ff6b6b;
+  border: 3px solid white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  font-weight: bold;
+  color: white;
+  font-size: 16px;
+}
+
+:deep(.keypoint-popup) {
+  min-width: 200px;
+}
+
+:deep(.keypoint-popup h4) {
+  margin: 0 0 0.5rem 0;
+  color: #2c3e50;
+  font-size: 1.1rem;
+}
+
+:deep(.keypoint-popup p) {
+  margin: 0.5rem 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+:deep(.keypoint-popup .coords) {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  color: #888;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e0e0e0;
 }
 
 @media (max-width: 968px) {

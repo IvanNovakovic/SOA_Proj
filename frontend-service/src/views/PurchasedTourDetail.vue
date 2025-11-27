@@ -260,6 +260,7 @@ export default {
     const reviewLoading = ref(false)
     const imagesText = ref('')
     const loadingReviews = ref(false)
+    const loadingKeyPoints = ref(false)
 
     const reviewForm = ref({
       rating: 0,
@@ -292,11 +293,15 @@ export default {
     }
 
     const fetchKeyPoints = async () => {
+      loadingKeyPoints.value = true
       try {
         const data = await api.getKeyPoints(tourId)
         keyPoints.value = data || []
-      } catch {
+      } catch (err) {
+        console.error('Failed to load key points:', err)
         keyPoints.value = []
+      } finally {
+        loadingKeyPoints.value = false
       }
     }
 
@@ -396,36 +401,64 @@ export default {
     }
 
     const finishTour = async () => {
-      if (!execution.value) return
+      if (!execution.value) {
+        console.error('No execution found')
+        return
+      }
       try {
-        await api.updateExecution(execution.value.id, { status: 'completed', completedPoints: execution.value.completedPoints })
+        console.log('Finishing tour with execution:', execution.value.id)
+        // Extract keypoint IDs from completedPoints array
+        const completedPointIds = execution.value.completedPoints?.map(cp => cp.keyPointId) || []
+        await api.updateExecution(execution.value.id, { 
+          status: 'completed', 
+          completedPoints: completedPointIds
+        })
         execution.value.status = 'completed'
+        notification.value = 'Tour completed successfully!'
+        setTimeout(() => {
+          notification.value = null
+        }, 3000)
       } catch (err) {
-        console.error(err)
+        console.error('Failed to finish tour:', err)
+        notification.value = 'Failed to finish tour. Please try again.'
+        setTimeout(() => {
+          notification.value = null
+        }, 3000)
       }
     }
 
     const abandonTour = async () => {
-      if (!execution.value) return
+      if (!execution.value) {
+        console.error('No execution found')
+        return
+      }
       try {
-        await api.updateExecution(execution.value.id, { status: 'abandoned', completedPoints: execution.value.completedPoints })
+        console.log('Abandoning tour with execution:', execution.value.id)
+        // Extract keypoint IDs from completedPoints array
+        const completedPointIds = execution.value.completedPoints?.map(cp => cp.keyPointId) || []
+        await api.updateExecution(execution.value.id, { 
+          status: 'abandoned', 
+          completedPoints: completedPointIds
+        })
         execution.value.status = 'abandoned'
+        notification.value = 'Tour abandoned.'
+        setTimeout(() => {
+          notification.value = null
+        }, 3000)
       } catch (err) {
-        console.error(err)
+        console.error('Failed to abandon tour:', err)
+        notification.value = 'Failed to abandon tour. Please try again.'
+        setTimeout(() => {
+          notification.value = null
+        }, 3000)
       }
     }
 
-    const onLocationUpdate = async ({ latitude, longitude }) => {
-      if (!execution.value) return
-      await api.addExecutionLocation(execution.value.id, { latitude, longitude })
-      for (const kp of keyPoints.value) {
-        if (!execution.value.completedPoints.includes(kp.id)) {
-          const dist = Math.hypot(latitude - kp.latitude, longitude - kp.longitude)
-          if (dist < 0.0001) { // approx ~11m
-            await api.completeExecutionPoint(execution.value.id, { keyPointId: kp.id })
-            execution.value.completedPoints.push(kp.id)
-          }
-        }
+    const onLocationUpdate = (updatedExecution) => {
+      // Update execution with the fresh data from backend
+      if (updatedExecution) {
+        execution.value = updatedExecution
+        console.log('Execution updated:', updatedExecution.completedPoints?.length || 0, 'points completed')
       }
     }
 
@@ -436,10 +469,14 @@ export default {
     })
 
 
-    return { tour, 
-      keyPoints, 
-      reviews, execution, 
-      loading, error, 
+    return { 
+      tour, 
+      keyPoints,
+      loadingKeyPoints,
+      reviews, 
+      execution, 
+      loading, 
+      error, 
       startTour, 
       finishTour, 
       abandonTour, 

@@ -15,11 +15,12 @@ import (
 )
 
 type TourRepository struct {
-	client  *mongo.Client
-	col     *mongo.Collection
-	kpCol   *mongo.Collection
-	revCol  *mongo.Collection
-	execCol *mongo.Collection
+	client    *mongo.Client
+	col       *mongo.Collection
+	kpCol     *mongo.Collection
+	revCol    *mongo.Collection
+	execCol   *mongo.Collection
+	tokensCol *mongo.Collection
 }
 
 func NewTourRepository(ctx context.Context, uri string, dbName string) (*TourRepository, error) {
@@ -34,6 +35,10 @@ func NewTourRepository(ctx context.Context, uri string, dbName string) (*TourRep
 	kpCol := db.Collection("keypoints")
 	revCol := db.Collection("reviews")
 	execCol := db.Collection("executions")
+
+	// Access purchases database for checking purchased tours
+	purchaseDB := client.Database("purchases")
+	tokensCol := purchaseDB.Collection("tokens")
 
 	// create simple index on authorId and tourId and indexes for keypoints/reviews
 	_, _ = col.Indexes().CreateOne(ctx, mongo.IndexModel{
@@ -58,7 +63,14 @@ func NewTourRepository(ctx context.Context, uri string, dbName string) (*TourRep
 	_, _ = execCol.Indexes().CreateOne(ctx, mongo.IndexModel{
 		Keys: bson.D{{Key: "status", Value: 1}},
 	})
-	return &TourRepository{client: client, col: col, kpCol: kpCol, revCol: revCol, execCol: execCol}, nil
+	return &TourRepository{
+		client:    client,
+		col:       col,
+		kpCol:     kpCol,
+		revCol:    revCol,
+		execCol:   execCol,
+		tokensCol: tokensCol,
+	}, nil
 }
 
 func (r *TourRepository) Close(ctx context.Context) error {
@@ -473,6 +485,21 @@ func (r *TourRepository) HasAnyActiveExecution(ctx context.Context, touristId st
 	}
 
 	count, err := r.execCol.CountDocuments(ctx, filter)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
+// HasUserPurchasedTour checks if a user has purchased a specific tour
+func (r *TourRepository) HasUserPurchasedTour(ctx context.Context, userId string, tourId string) (bool, error) {
+	filter := bson.M{
+		"user_id": userId,
+		"tour_id": tourId,
+	}
+
+	count, err := r.tokensCol.CountDocuments(ctx, filter)
 	if err != nil {
 		return false, err
 	}

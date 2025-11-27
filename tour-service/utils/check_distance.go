@@ -21,7 +21,7 @@ func HaversineDistance(lat1, lon1, lat2, lon2 float64) float64 {
 }
 
 // threshold in meters to consider a tourist "near" a key point
-const KeyPointThreshold = 15.0
+const KeyPointThreshold = 30.0
 
 func IsNearby(lat1, lon1, lat2, lon2 float64) bool {
 	distance := HaversineDistance(lat1, lon1, lat2, lon2)
