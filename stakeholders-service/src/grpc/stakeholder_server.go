@@ -41,6 +41,11 @@ func (s *StakeholderServer) Login(ctx context.Context, req *pb.LoginRequest) (*p
 		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
 	}
 
+	// Check if user is blocked
+	if u.IsBlocked {
+		return nil, status.Error(codes.PermissionDenied, "account has been blocked")
+	}
+
 	token, err := auth.IssueToken(u.ID.Hex(), u.Username, u.Roles, 60*time.Minute)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "token generation error")

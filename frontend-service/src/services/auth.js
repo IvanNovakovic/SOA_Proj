@@ -14,11 +14,35 @@ export const authService = {
       
       return response
     } catch (error) {
-      const message = error.response?.data?.message || 
-                     error.response?.data || 
-                     error.message ||
-                     'Login failed'
-      throw new Error(typeof message === 'string' ? message : 'Login failed')
+      // Extract error message from response
+      let message = 'Login failed. Please try again.'
+      const errorData = error.response?.data
+      
+      // Check for blocked account (403 or message containing "blocked")
+      if (error.response?.status === 403 || 
+          (typeof errorData === 'string' && errorData.toLowerCase().includes('blocked'))) {
+        message = '🚫 Your account has been blocked. Please contact an administrator for assistance.'
+      } else if (error.response?.status === 401) {
+        if (typeof errorData === 'string' && errorData.includes('invalid credentials')) {
+          message = 'Invalid username or password. Please check your credentials and try again.'
+        } else {
+          message = 'Authentication failed. Please verify your username and password.'
+        }
+      } else if (error.response?.data) {
+        if (typeof errorData === 'string') {
+          message = errorData
+        } else if (errorData.message) {
+          message = errorData.message
+        }
+      } else if (error.message) {
+        if (error.message.includes('Network Error')) {
+          message = 'Unable to connect to the server. Please check your internet connection and try again.'
+        } else {
+          message = error.message
+        }
+      }
+      
+      throw new Error(message)
     }
   },
 

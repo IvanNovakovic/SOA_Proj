@@ -168,9 +168,10 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../services/api'
+import routingService from '../services/routingService'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import draggable from 'vuedraggable'
@@ -195,6 +196,11 @@ export default {
     const showForm = ref(false)
     const editingKeyPoint = ref(null)
     const totalDistance = ref(0)
+    const routingProfile = ref('foot-walking')
+    const routingProfiles = routingService.getProfiles()
+    const routes = ref([])
+    const routesCalculated = ref(false)
+    const routePolylines = ref([])
 
     const form = ref({
       name: '',
@@ -207,6 +213,11 @@ export default {
     const loading = ref(false)
     const error = ref('')
     const success = ref('')
+
+    const currentProfileLabel = computed(() => {
+      const profile = routingProfiles.find(p => p.value === routingProfile.value)
+      return profile ? profile.icon : '🚶'
+    })
 
     const initMap = () => {
       map = L.map('map').setView([44.8176, 20.4633], 13)
@@ -240,15 +251,17 @@ export default {
       })
     }
 
-    const renderMarkers = () => {
+    const renderMarkers = async () => {
       markers.forEach(m => map.removeLayer(m))
       markers = []
 
-      // Remove existing route
+      // Remove existing route polylines
       if (routePolyline) {
         map.removeLayer(routePolyline)
         routePolyline = null
       }
+      routePolylines.value.forEach(line => map.removeLayer(line))
+      routePolylines.value = []
 
       keypoints.value.forEach((kp, index) => {
         const icon = L.divIcon({
@@ -265,20 +278,12 @@ export default {
         markers.push(marker)
       })
 
-      // Draw route line between points
+      // Draw route using routing service
       if (keypoints.value.length > 1) {
-        const routeCoordinates = keypoints.value.map(kp => [kp.latitude, kp.longitude])
-        routePolyline = L.polyline(routeCoordinates, {
-          color: '#42b983',
-          weight: 4,
-          opacity: 0.7,
-          smoothFactor: 1
-        }).addTo(map)
-
-        // Calculate total distance
-        calculateTotalDistance()
+        await updateRoutes()
       } else {
         totalDistance.value = 0
+        routesCalculated.value = false
       }
 
       if (keypoints.value.length > 0) {
@@ -287,22 +292,148 @@ export default {
       }
     }
 
-    const calculateTotalDistance = () => {
-      let distance = 0
-      for (let i = 0; i < keypoints.value.length - 1; i++) {
-        const from = L.latLng(keypoints.value[i].latitude, keypoints.value[i].longitude)
-        const to = L.latLng(keypoints.value[i + 1].latitude, keypoints.value[i + 1].longitude)
-        distance += from.distanceTo(to) // distance in meters
+    const updateRoutes = async () => {
+      if (keypoints.value.length < 2) {
+        return
       }
-      totalDistance.value = distance / 1000 // convert to kilometers
+
+      // Remove existing route polylines
+      routePolylines.value.forEach(line => map.removeLayer(line))
+      routePolylines.value = []
+
+      if (!routingService.isConfigured()) {
+        // Fallback to straight lines if routing service not configured
+        const routeCoordinates = keypoints.value.map(kp => [kp.latitude, kp.longitude])
+        routePolyline = L.polyline(routeCoordinates, {
+          color: '#42b983',
+          weight: 4,
+          opacity: 0.7,
+          dashArray: '5, 10',
+          smoothFactor: 1
+        }).addTo(map)
+        
+        // Calculate straight-line distance
+        let distance = 0
+        for (let i = 0; i < keypoints.value.length - 1; i++) {
+          const from = L.latLng(keypoints.value[i].latitude, keypoints.value[i].longitude)
+          const to = L.latLng(keypoints.value[i + 1].latitude, keypoints.value[i + 1].longitude)
+          distance += from.distanceTo(to)
+        }
+        totalDistance.value = distance / 1000
+        routesCalculated.value = false
+        return
+      }
+
+      try {
+        // Calculate routes using routing service
+        routes.value = await routingService.calculateTourRoute(
+          keypoints.value,
+          routingProfile.value
+        )
+
+        // Draw each route segment
+        routes.value.forEach((segment) => {
+          if (segment.route && segment.route.geometry) {
+            // Convert [lng, lat] to [lat, lng] for Leaflet
+            const latLngs = segment.route.geometry.map(coord => [coord[1], coord[0]])
+            
+            const polyline = L.polyline(latLngs, {
+              color: '#42b983',
+              weight: 4,
+              opacity: 0.7,
+              smoothFactor: 1
+            }).addTo(map)
+            
+            routePolylines.value.push(polyline)
+          }
+        })
+
+        // Calculate total distance from routes
+        const stats = routingService.getTourStats(routes.value)
+        totalDistance.value = stats.distance / 1000 // convert to km
+        routesCalculated.value = true
+
+        // Update tour distance in backend
+        await updateTourDistance()
+      } catch (err) {
+        console.error('Failed to calculate routes:', err)
+        error.value = 'Could not calculate route. Using straight line instead.'
+        
+        // Fallback to straight line
+        const routeCoordinates = keypoints.value.map(kp => [kp.latitude, kp.longitude])
+        routePolyline = L.polyline(routeCoordinates, {
+          color: '#ff6b6b',
+          weight: 4,
+          opacity: 0.7,
+          dashArray: '5, 10',
+          smoothFactor: 1
+        }).addTo(map)
+        
+        let distance = 0
+        for (let i = 0; i < keypoints.value.length - 1; i++) {
+          const from = L.latLng(keypoints.value[i].latitude, keypoints.value[i].longitude)
+          const to = L.latLng(keypoints.value[i + 1].latitude, keypoints.value[i + 1].longitude)
+          distance += from.distanceTo(to)
+        }
+        totalDistance.value = distance / 1000
+        routesCalculated.value = false
+      }
     }
 
     const updateTourDistance = async () => {
+      if (keypoints.value.length < 2) {
+        return
+      }
+
       try {
-        await api.updateTour(tourId, { distance: totalDistance.value })
+        // Calculate durations for all transport modes
+        const durations = await calculateAllDurations()
+        
+        await api.updateTour(tourId, { 
+          distance: totalDistance.value,
+          durations: durations
+        })
       } catch (err) {
         console.error('Failed to update tour distance:', err)
       }
+    }
+
+    const calculateAllDurations = async () => {
+      const durations = {
+        walking: 0,
+        biking: 0,
+        driving: 0
+      }
+
+      if (!routingService.isConfigured() || keypoints.value.length < 2) {
+        return durations
+      }
+
+      try {
+        // Calculate for each profile
+        const profiles = [
+          { key: 'walking', value: 'foot-walking' },
+          { key: 'biking', value: 'cycling-regular' },
+          { key: 'driving', value: 'driving-car' }
+        ]
+
+        for (const profile of profiles) {
+          try {
+            const routes = await routingService.calculateTourRoute(
+              keypoints.value,
+              profile.value
+            )
+            const stats = routingService.getTourStats(routes)
+            durations[profile.key] = Math.ceil(stats.duration / 60) // Convert to minutes and round up
+          } catch (err) {
+            console.error(`Failed to calculate ${profile.key} duration:`, err)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to calculate durations:', err)
+      }
+
+      return durations
     }
 
     const fetchKeyPoints = async () => {
@@ -590,6 +721,40 @@ h1 {
   font-size: 0.9rem;
 }
 
+.routing-profile {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.routing-profile label {
+  color: #555;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.routing-profile select {
+  padding: 0.5rem 1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+  color: #333;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.routing-profile select:hover {
+  border-color: #42b983;
+}
+
+.routing-profile select:focus {
+  outline: none;
+  border-color: #42b983;
+  box-shadow: 0 0 0 3px rgba(66, 185, 131, 0.1);
+}
+
 #map {
   width: 100%;
   height: 600px;
@@ -657,6 +822,14 @@ h1 {
   color: #2e7d32;
   border: 2px solid #a5d6a7;
   font-weight: 500;
+}
+
+.route-badge {
+  background: rgba(46, 125, 50, 0.15);
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  margin-left: 0.5rem;
 }
 
 .distance-icon {

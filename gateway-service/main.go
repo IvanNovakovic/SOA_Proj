@@ -13,7 +13,9 @@ import (
 
 	pb "github.com/IvanNovakovic/SOA_Proj/protos"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -269,7 +271,23 @@ func main() {
 				"action":  "grpc_login",
 				"error":   err.Error(),
 			}).Error("gRPC login error")
-			http.Error(w, "login failed", http.StatusUnauthorized)
+
+			// Check gRPC status code and return appropriate HTTP status
+			st, ok := status.FromError(err)
+			if ok {
+				switch st.Code() {
+				case codes.PermissionDenied:
+					// User is blocked
+					http.Error(w, st.Message(), http.StatusForbidden)
+				case codes.Unauthenticated:
+					// Invalid credentials
+					http.Error(w, st.Message(), http.StatusUnauthorized)
+				default:
+					http.Error(w, "login failed", http.StatusInternalServerError)
+				}
+			} else {
+				http.Error(w, "login failed", http.StatusUnauthorized)
+			}
 			return
 		}
 

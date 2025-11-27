@@ -70,17 +70,8 @@ export default {
         // Use replace instead of push to avoid back button issues
         await router.replace('/')
       } catch (err) {
-        // Display user-friendly error messages
-        let errorMessage = err.message || 'Login failed. Please check your credentials.'
-        
-        // Make error messages clearer
-        if (errorMessage.includes('invalid credentials') || errorMessage.includes('Unauthorized')) {
-          errorMessage = 'Invalid username or password. Please try again.'
-        } else if (errorMessage.includes('Network Error') || errorMessage.includes('Failed to fetch')) {
-          errorMessage = 'Unable to connect to server. Please try again later.'
-        }
-        
-        error.value = errorMessage
+        // Display the error message from auth service
+        error.value = err.message || 'An unexpected error occurred. Please try again.'
       } finally {
         loading.value = false
       }

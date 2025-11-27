@@ -249,6 +249,19 @@ func (r *TourRepository) GetReviewsByTour(ctx context.Context, tourId primitive.
 	return out, nil
 }
 
+// HasUserReviewedTour checks if a user has already reviewed a tour
+func (r *TourRepository) HasUserReviewedTour(ctx context.Context, tourId primitive.ObjectID, authorId string) (bool, error) {
+	filter := bson.M{
+		"tourId":   tourId,
+		"authorId": authorId,
+	}
+	count, err := r.revCol.CountDocuments(ctx, filter)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (r *TourRepository) PublishTour(ctx context.Context, tourId string, authorId string) (*model.Tour, error) {
 	objID, err := primitive.ObjectIDFromHex(tourId)
 	if err != nil {

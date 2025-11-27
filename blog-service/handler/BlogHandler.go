@@ -2,11 +2,11 @@ package handler
 
 import (
 	"encoding/json"
-	"net/http"
-	"time"
-	"log"
-	"os"
 	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"time"
 
 	"github.com/gorilla/mux"
 
@@ -26,7 +26,10 @@ func RegisterRoutes(public *mux.Router, authRouter *mux.Router, repo *repository
 	// protected (reads require authentication/follow checks)
 	if authRouter != nil {
 		authRouter.HandleFunc("/blogs", h.listBlogs).Methods("GET")
+		authRouter.HandleFunc("/blogs/my", h.getMyBlogs).Methods("GET")
 		authRouter.HandleFunc("/blogs/{id}", h.getBlog).Methods("GET")
+		authRouter.HandleFunc("/blogs/{id}", h.updateBlog).Methods("PUT", "PATCH")
+		authRouter.HandleFunc("/blogs/{id}", h.deleteBlog).Methods("DELETE")
 	} else {
 		// fallback to public if no auth router provided (handlers will still enforce auth)
 		public.HandleFunc("/blogs", h.listBlogs).Methods("GET")
@@ -60,11 +63,11 @@ func (h *blogHandler) createBlog(w http.ResponseWriter, r *http.Request) {
 			in.AuthorName = a.Username
 		}
 	}
-    if err := h.repo.Create(r.Context(), &in); err != nil {
-        log.Printf("create blog error: %v", err)
-        http.Error(w, "failed to create blog: "+err.Error(), http.StatusInternalServerError)
-        return
-    }
+	if err := h.repo.Create(r.Context(), &in); err != nil {
+		log.Printf("create blog error: %v", err)
+		http.Error(w, "failed to create blog: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(in)
@@ -84,8 +87,7 @@ func (h *blogHandler) listBlogs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to get following: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	// include self so users see their own blogs
-	following = append(following, a.UserID)
+	// Don't include self - user's own blogs should only show in "My Blogs"
 
 	blogs, err := h.repo.GetByAuthorIDs(r.Context(), following)
 	if err != nil {
@@ -135,6 +137,116 @@ func (h *blogHandler) getBlog(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(b)
+}
+
+func (h *blogHandler) updateBlog(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+	if id == "" {
+		http.Error(w, "id required", http.StatusBadRequest)
+		return
+	}
+
+	// Check if blog exists and user is the author
+	b, err := h.repo.GetByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "blog not found", http.StatusNotFound)
+		return
+	}
+
+	a := auth.GetAuth(r)
+	if a == nil || a.UserID == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if b.AuthorID != a.UserID {
+		http.Error(w, "forbidden: you can only edit your own blogs", http.StatusForbidden)
+		return
+	}
+
+	var in struct {
+		Title       string   `json:"title"`
+		Description string   `json:"description"`
+		Images      []string `json:"images"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if in.Title == "" || in.Description == "" {
+		http.Error(w, "title and description are required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.repo.Update(r.Context(), id, in.Title, in.Description, in.Images); err != nil {
+		log.Printf("update blog error: %v", err)
+		http.Error(w, "failed to update blog", http.StatusInternalServerError)
+		return
+	}
+
+	// Get updated blog
+	updated, err := h.repo.GetByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "failed to retrieve updated blog", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updated)
+}
+
+func (h *blogHandler) deleteBlog(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+	if id == "" {
+		http.Error(w, "id required", http.StatusBadRequest)
+		return
+	}
+
+	// Check if blog exists and user is the author
+	b, err := h.repo.GetByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "blog not found", http.StatusNotFound)
+		return
+	}
+
+	a := auth.GetAuth(r)
+	if a == nil || a.UserID == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if b.AuthorID != a.UserID {
+		http.Error(w, "forbidden: you can only delete your own blogs", http.StatusForbidden)
+		return
+	}
+
+	if err := h.repo.Delete(r.Context(), id); err != nil {
+		log.Printf("delete blog error: %v", err)
+		http.Error(w, "failed to delete blog", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *blogHandler) getMyBlogs(w http.ResponseWriter, r *http.Request) {
+	a := auth.GetAuth(r)
+	if a == nil || a.UserID == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	blogs, err := h.repo.GetByAuthorID(r.Context(), a.UserID)
+	if err != nil {
+		http.Error(w, "failed to get blogs", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(blogs)
 }
 
 // getFollowingIDs calls follower-service to retrieve list of user IDs the given user is following.

@@ -101,6 +101,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../services/api'
+import routingService from '../services/routingService'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -189,41 +190,44 @@ export default {
 
       isCalculatingRoute.value = true
 
-      try {
-        const coordinates = keypoints.value.map(kp => [kp.longitude, kp.latitude])
+      if (!routingService.isConfigured()) {
+        // Fallback to straight line if no API key
+        calculateStraightLineRoute()
+        isCalculatingRoute.value = false
+        return
+      }
 
-        const response = await fetch('/api/route', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            coordinates: coordinates,
-            instructions: false,
-            preference: 'recommended'
-          })
+      try {
+        // Use foot-walking as default for tour viewing
+        const routes = await routingService.calculateTourRoute(
+          keypoints.value,
+          'foot-walking'
+        )
+
+        // Draw all route segments
+        const allCoords = []
+        routes.forEach((segment) => {
+          if (segment.route && segment.route.geometry) {
+            // Convert [lng, lat] to [lat, lng] for Leaflet
+            const latLngs = segment.route.geometry.map(coord => [coord[1], coord[0]])
+            allCoords.push(...latLngs)
+          }
         })
 
-        if (!response.ok) {
-          throw new Error(`Failed to calculate route: ${response.status}`)
-        }
-
-        const data = await response.json()
-        
-        if (data.features && data.features.length > 0) {
-          const route = data.features[0]
-          const geometry = route.geometry
-          
-          const routeCoords = geometry.coordinates.map(coord => [coord[1], coord[0]])
-          
-          routePolyline = L.polyline(routeCoords, {
+        if (allCoords.length > 0) {
+          routePolyline = L.polyline(allCoords, {
             color: '#42b983',
             weight: 4,
             opacity: 0.7,
             smoothFactor: 1
           }).addTo(map)
-          
-          totalDistance.value = route.properties.summary.distance / 1000
+
+          // Calculate total distance from routes
+          const stats = routingService.getTourStats(routes)
+          totalDistance.value = stats.distance / 1000 // convert to km
+        } else {
+          // Fallback if no route geometry
+          calculateStraightLineRoute()
         }
       } catch (err) {
         console.error('Error calculating route:', err)
