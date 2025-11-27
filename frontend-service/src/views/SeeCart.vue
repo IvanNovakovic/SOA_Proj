@@ -16,6 +16,10 @@
       <p>No items in your cart.</p>
     </div>
 
+    <div v-if="notification" class="notification">
+      {{ notification }}
+    </div>
+
     <ul v-else>
       <li v-for="item in cart.items" :key="item.id" class="cart-item">
         <span>Tour: {{ item.name }}</span>
@@ -35,6 +39,8 @@
 import { ref, onMounted } from "vue"
 import { api } from "../services/api"
 import { authStore } from "../stores/authStore"
+import { useRouter } from "vue-router"
+
 
 export default {
   name: "SeeCart",
@@ -42,6 +48,9 @@ export default {
     const cart = ref({ items: [], total: 0 })
     const loading = ref(true)
     const error = ref("")
+    const router = useRouter()
+    const notification = ref("")  
+
 
     const fetchCart = async () => {
       loading.value = true
@@ -64,6 +73,8 @@ export default {
         
         cart.value.items = data.items
         cart.value.total = data.total
+        notification.value = "Item removed successfully!"
+        setTimeout(() => (notification.value = ""), 1000)
       } catch (err) {
         console.error(err)
         error.value = err.response?.data?.detail || "Failed to remove item."
@@ -74,12 +85,15 @@ export default {
       try {
         const userId = authStore.getUserId()
         await api.checkoutCart(userId)
-        alert("Checkout successful!")
         cart.value = { items: [], total: 0 }
-        router.push("/purchased-tours")
-      } catch (err) {
-        console.error(err)
-        error.value = err.response?.data?.detail 
+        notification.value = "Checkout successful!"
+                setTimeout(() => {
+                  notification.value = ""
+                  router.push("/purchased-tours")
+                }, 1500)      
+        } catch (err) {
+          console.error(err)
+          error.value = err.response?.data?.detail  || "Checkout failed."
       }
     }
 
@@ -88,6 +102,7 @@ export default {
     return { cart, 
              loading, 
              error, 
+             notification,
              removeItem,
              checkoutCart }
   }
@@ -256,5 +271,20 @@ export default {
     gap: 0.5rem;
   }
 }
+
+.notification {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  background: #42b983;
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(66, 185, 131, 0.3);
+  font-weight: 600;
+  z-index: 2000;
+  transition: all 0.3s;
+}
+
 </style>
 

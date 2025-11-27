@@ -19,7 +19,7 @@
           <router-link to="/tours" class="nav-link" @click="closeMenu">Tours</router-link>
           <router-link to="/blogs" class="nav-link" @click="closeMenu">Blogs</router-link>
           <router-link to="/recommendations" class="nav-link" @click="closeMenu">Discover</router-link>
-          <router-link to="/purchased-tours" class="nav-link" @click="closeMenu">Purchased Tours</router-link>
+          <router-link v-if="isTourist" to="/purchased-tours" class="nav-link" @click="closeMenu">Purchased Tours</router-link>
           <router-link to="/profile" class="nav-link" @click="closeMenu">Profile</router-link>
           <router-link v-if="isAdmin" to="/admin/users" class="nav-link" @click="closeMenu">Admin</router-link>
         </div>
@@ -34,7 +34,7 @@
           <span class="user-name">{{ username }}</span>
 
           <!-- CART ICON -->
-          <router-link to="/cart" class="cart-icon">
+          <router-link v-if="isTourist" to="/cart" class="cart-icon">
             🛒
             <span v-if="cartCount > 0" class="cart-count">{{ cartCount }}</span>
           </router-link>
@@ -66,6 +66,11 @@ export default {
       return user && user.roles && user.roles.includes('admin')
     })
 
+    const isTourist = computed(() => {
+      const user = authService.getUserFromToken()
+      return user && user.roles && user.roles.includes('tourist')
+    })
+
      const cartCount = ref(0)
 
     const fetchCartCount = async () => {
@@ -95,12 +100,14 @@ export default {
       // Force a full navigation to home
       router.replace('/')
     }
-
     return {
       menuOpen,
       isLoggedIn,
       username,
       isAdmin,
+      isTourist,
+      cartCount,
+      fetchCartCount,
       toggleMenu,
       closeMenu,
       logout

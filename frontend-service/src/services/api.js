@@ -275,9 +275,20 @@ export const api = {
     return response.data
   },
   async getActiveExecution(tourId) {
+   /* const response = await apiClient.get(`/executions/${tourId}/active`)
+    return response.data
+  },*/
+    try {
     const response = await apiClient.get(`/executions/${tourId}/active`)
     return response.data
-  },
+  } catch (err) {
+    if (err.response?.status === 404) {
+      // Nema aktivne execution, to nije fatalna greška
+      return null
+    }
+    throw err
+  }
+},
 
   async updateExecution(execId, { status, completedPoints }) {
     const response = await apiClient.put(`/executions/${execId}`, {

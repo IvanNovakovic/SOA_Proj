@@ -3,6 +3,10 @@
     <div v-if="loading" class="loading">Loading tour...</div>
     <div v-else-if="error" class="error-message">{{ error }}</div>
 
+    <div v-if="notification" class="notification">
+      {{ notification }}
+    </div>
+
     <div v-else class="tour-content">
       <div class="tour-header">
         <h1>Purchased tour: {{ tour.name }}</h1>
@@ -195,7 +199,7 @@
             <button 
               class="btn-action btn-primary"
               @click="startTour"
-              :disabled="execution || tour.status !== 'published'"
+              :disabled="execution || !['published', 'archived'].includes(tour.status)"
             >
               Start Tour
             </button>
@@ -249,6 +253,8 @@ export default {
     const execution = ref(null)
     const loading = ref(true)
     const error = ref('')
+    const notification = ref('') 
+
 
     const showReviewForm = ref(false)
     const reviewLoading = ref(false)
@@ -373,11 +379,19 @@ export default {
     }
 
     const startTour = async () => {
-      try {
+       try {
+        const activeExecution = await api.getActiveExecution(authStore.getUserId())
+       if (activeExecution) {
+      notification.value = "You can only have 1 active tour at a time!"
+      setTimeout(() => (notification.value = ""), 3000)
+      return
+      }
         const data = await api.startExecution(tourId)
         execution.value = data
       } catch (err) {
         console.error(err)
+        notification.value = err.response?.data?.error || "Already have a active tour."
+        setTimeout(() => (notification.value = ""), 3000)
       }
     }
 
@@ -404,11 +418,10 @@ export default {
     const onLocationUpdate = async ({ latitude, longitude }) => {
       if (!execution.value) return
       await api.addExecutionLocation(execution.value.id, { latitude, longitude })
-      // Check proximity to keypoints
       for (const kp of keyPoints.value) {
         if (!execution.value.completedPoints.includes(kp.id)) {
           const dist = Math.hypot(latitude - kp.latitude, longitude - kp.longitude)
-          if (dist < 0.001) { // ~100m
+          if (dist < 0.0001) { // approx ~11m
             await api.completeExecutionPoint(execution.value.id, { keyPointId: kp.id })
             execution.value.completedPoints.push(kp.id)
           }
@@ -441,8 +454,9 @@ export default {
       submitReview,
       cancelReview,
       formatDate,
-      formatDuration
-     }
+      formatDuration,
+      notification     
+    }
   }
 }
 </script>
@@ -1063,8 +1077,19 @@ export default {
   background: #d32f2f;
 }
 
-
-
+.notification {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  background: #f44336;
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  font-weight: 600;
+  z-index: 2000;
+  transition: all 0.3s;
+}
 </style>
 
 

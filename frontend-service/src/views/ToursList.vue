@@ -1,5 +1,10 @@
 <template>
   <div class="tours-list">
+
+     <div v-if="notification" class="notification">
+      {{ notification }}
+    </div>
+
     <div v-if="loading" class="loading">
       <div class="spinner"></div>
       <p>Loading tours...</p>
@@ -92,8 +97,8 @@
 
              <button 
               class="btn-addToCart" 
-              @click="addToCart(tour)" 
               :disabled="addedToCart.has(tour.id)"
+              @click="addToCart(tour)"
             >
               {{ addedToCart.has(tour.id) ? 'Added' : 'Add to Cart' }}
             </button>
@@ -117,7 +122,10 @@ export default {
     const tours = ref([])
     const loading = ref(true)
     const error = ref('')
+    const cartCounts = ref({})
+    const notification = ref("")  
     const addedToCart = ref(new Set())
+    const cart = ref({ items: [], total: 0 })
 
 
     const fetchToursFromFollowing = async () => {
@@ -205,6 +213,7 @@ export default {
 
     onMounted(() => {
       fetchToursFromFollowing()
+      fetchCart()
     })
 
     const formatDuration = (minutes) => {
@@ -220,6 +229,17 @@ export default {
       return durations && (durations.walking > 0 || durations.biking > 0 || durations.driving > 0)
     }
 
+    const fetchCart = async () => {
+      try {
+        const userId = authStore.getUserId()
+        const data = await api.getCart(userId)
+        cart.value = data
+        addedToCart.value = new Set(data.items.map(i => i.tour_id))
+      } catch (err) {
+        console.error(err)
+      }
+    }
+
     const addToCart = async (tour) => {
         if (addedToCart.value.has(tour.id)) return 
 
@@ -231,13 +251,19 @@ export default {
           }
 
           await api.addToCart(item)
-
-          alert(`Tour "${tour.name}" added to your cart!`)
           addedToCart.value.add(tour.id)
 
+          cart.value.items.push(item)
+          cart.value.total += item.price || 0
+
+          notification.value = `Tour "${tour.name}" added to your cart!`
+            setTimeout(() => {
+              notification.value = ''
+            }, 3000)
+
         } catch (err) {
-          console.error('Failed to add tour to cart:', err)
-          alert(err.response?.data?.detail || err.message || 'Failed to add tour to cart')
+          console.error(err)
+          alert(err.message || 'Failed to add tour to cart')
         }
       }
 
@@ -245,10 +271,13 @@ export default {
       tours,
       loading,
       error,
+      cartCounts,
       addedToCart,
+      notification,
       formatDuration,
       hasDurations,
-      addToCart
+      addToCart,
+      cart
     }
   }
 }
@@ -642,5 +671,19 @@ export default {
   transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(255, 126, 95, 0.4);
 }
+
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #42b983;
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  z-index: 1000;
+  transition: all 0.3s;
+}
+
 
 </style>
