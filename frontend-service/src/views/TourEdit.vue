@@ -82,39 +82,24 @@
           </div>
         </div>
 
-        <div class="form-group">
-          <label>Transport Durations (minutes)</label>
-          <p class="field-note">Set at least one duration to publish the tour</p>
-          <div class="durations-grid">
-            <div class="duration-input">
-              <label for="walking">🚶 Walking</label>
-              <input 
-                id="walking"
-                v-model.number="form.durations.walking" 
-                type="number" 
-                min="0"
-                placeholder="0"
-              />
+        <div class="form-group info-section">
+          <label>Transport Durations</label>
+          <p class="field-note">⏱️ Durations are automatically calculated from your tour's key points</p>
+          <div class="durations-display">
+            <div class="duration-badge">
+              <span class="duration-icon">🚶</span>
+              <span class="duration-label">Walking</span>
+              <span class="duration-value">{{ form.durations.walking > 0 ? `${form.durations.walking} min` : 'Not set' }}</span>
             </div>
-            <div class="duration-input">
-              <label for="biking">🚴 Biking</label>
-              <input 
-                id="biking"
-                v-model.number="form.durations.biking" 
-                type="number" 
-                min="0"
-                placeholder="0"
-              />
+            <div class="duration-badge">
+              <span class="duration-icon">🚴</span>
+              <span class="duration-label">Cycling</span>
+              <span class="duration-value">{{ form.durations.biking > 0 ? `${form.durations.biking} min` : 'Not set' }}</span>
             </div>
-            <div class="duration-input">
-              <label for="driving">🚗 Driving</label>
-              <input 
-                id="driving"
-                v-model.number="form.durations.driving" 
-                type="number" 
-                min="0"
-                placeholder="0"
-              />
+            <div class="duration-badge">
+              <span class="duration-icon">🚗</span>
+              <span class="duration-label">Driving</span>
+              <span class="duration-value">{{ form.durations.driving > 0 ? `${form.durations.driving} min` : 'Not set' }}</span>
             </div>
           </div>
         </div>
@@ -208,8 +193,8 @@ export default {
           difficulty: form.value.difficulty,
           tags: form.value.tags,
           status: form.value.status,
-          price: form.value.price,
-          durations: form.value.durations
+          price: form.value.price
+          // durations are auto-updated when keypoints change
         }
 
         await api.updateTour(tourId, tourData)
@@ -366,30 +351,59 @@ textarea {
   color: #c33;
 }
 
-.durations-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1rem;
-  margin-top: 0.5rem;
+.info-section {
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #d4dce6;
 }
 
-.duration-input {
+.info-section label {
+  color: #2c3e50;
+  font-size: 1.1rem;
+  margin-bottom: 0.25rem;
+}
+
+.durations-display {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.duration-badge {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 0.5rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 2px solid #e0e6ed;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.duration-input label {
-  font-size: 0.9rem;
+.duration-badge:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.duration-icon {
+  font-size: 2rem;
+  margin-bottom: 0.25rem;
+}
+
+.duration-label {
   font-weight: 600;
   color: #555;
+  font-size: 0.95rem;
 }
 
-.duration-input input {
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 1rem;
+.duration-value {
+  color: #42b983;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .field-note {

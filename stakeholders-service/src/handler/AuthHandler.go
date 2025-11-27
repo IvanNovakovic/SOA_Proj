@@ -118,6 +118,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if user is blocked
+	if u.IsBlocked {
+		http.Error(w, "account has been blocked", http.StatusForbidden)
+		return
+	}
+
 	token, err := auth.IssueToken(u.ID.Hex(), u.Username, u.Roles, 60*time.Minute)
 	if err != nil {
 		http.Error(w, "token error", http.StatusInternalServerError)

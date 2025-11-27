@@ -52,7 +52,9 @@
         <div v-else class="comments-list">
           <div v-for="comment in comments" :key="comment.id" class="comment">
             <div class="comment-header">
-              <span class="comment-author">{{ comment.author_name }}</span>
+              <router-link :to="`/user/${comment.author_name}`" class="comment-author">
+                {{ comment.author_name }}
+              </router-link>
               <span class="comment-date">{{ formatDate(comment.created_at) }}</span>
             </div>
             <p class="comment-text">{{ comment.text }}</p>
@@ -403,6 +405,13 @@ function formatDate(dateString) {
 .comment-author {
   font-weight: 500;
   color: #2c3e50;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.comment-author:hover {
+  color: #42b983;
+  text-decoration: underline;
 }
 
 .comment-date {

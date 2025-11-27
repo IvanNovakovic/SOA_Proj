@@ -102,9 +102,21 @@ const routes = [
         component: () => import('../views/BlogList.vue')
       },
       {
+        path: 'my',
+        name: 'MyBlogs',
+        component: () => import('../views/MyBlogs.vue'),
+        meta: { requiresAuth: true }
+      },
+      {
         path: 'create',
         name: 'BlogCreate',
         component: () => import('../views/BlogCreate.vue'),
+        meta: { requiresAuth: true }
+      },
+      {
+        path: ':id/edit',
+        name: 'BlogEdit',
+        component: () => import('../views/BlogEdit.vue'),
         meta: { requiresAuth: true }
       },
       {

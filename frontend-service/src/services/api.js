@@ -29,10 +29,14 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('jwt_token')
-      localStorage.removeItem('username')
-      window.location.href = '/login'
+      // Only redirect to login if not already on login/register pages
+      const currentPath = window.location.pathname
+      if (!['/login', '/register'].includes(currentPath)) {
+        // Token expired or invalid
+        localStorage.removeItem('jwt_token')
+        localStorage.removeItem('username')
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }
@@ -170,6 +174,11 @@ export const api = {
     return response.data
   },
 
+  async getMyBlogs() {
+    const response = await apiClient.get('/blogs/my')
+    return response.data
+  },
+
   async getBlogById(id) {
     const response = await apiClient.get(`/blogs/${id}`)
     return response.data
@@ -177,6 +186,16 @@ export const api = {
 
   async createBlog(blogData) {
     const response = await apiClient.post('/blogs', blogData)
+    return response.data
+  },
+
+  async updateBlog(id, blogData) {
+    const response = await apiClient.put(`/blogs/${id}`, blogData)
+    return response.data
+  },
+
+  async deleteBlog(id) {
+    const response = await apiClient.delete(`/blogs/${id}`)
     return response.data
   },
 

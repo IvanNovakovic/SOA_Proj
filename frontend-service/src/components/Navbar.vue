@@ -18,6 +18,7 @@
           <router-link to="/" class="nav-link" @click="closeMenu">Home</router-link>
           <router-link to="/tours" class="nav-link" @click="closeMenu">Tours</router-link>
           <router-link to="/blogs" class="nav-link" @click="closeMenu">Blogs</router-link>
+          <router-link to="/blogs/my" class="nav-link" @click="closeMenu">My Blogs</router-link>
           <router-link to="/recommendations" class="nav-link" @click="closeMenu">Discover</router-link>
           <router-link to="/profile" class="nav-link" @click="closeMenu">Profile</router-link>
           <router-link v-if="isAdmin" to="/admin/users" class="nav-link" @click="closeMenu">Admin</router-link>

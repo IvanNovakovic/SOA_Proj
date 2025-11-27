@@ -16,6 +16,12 @@
         </div>
         <!-- Author Actions -->
         <div v-if="isAuthor" class="author-actions">
+          <router-link 
+            :to="`/tours/${tour.id}/edit`" 
+            class="btn-action btn-edit"
+          >
+            ✏️ Edit Tour
+          </router-link>
           <button 
             v-if="tour.status === 'draft'" 
             @click="publishTour" 
@@ -300,7 +306,15 @@ export default {
     })
 
     const canAddReview = computed(() => {
-      return authStore.isAuthenticated.value && !isAuthor.value
+      if (!authStore.isAuthenticated.value || isAuthor.value) {
+        return false
+      }
+      
+      // Check if user has already reviewed this tour
+      const userId = authStore.getUserId()
+      const hasReviewed = reviews.value.some(review => review.touristId === userId)
+      
+      return !hasReviewed
     })
 
     const fetchTour = async () => {
@@ -377,7 +391,14 @@ export default {
         // Reload reviews
         await fetchReviews()
       } catch (err) {
-        alert(err.response?.data?.error || err.message || 'Failed to submit review')
+        const errorMessage = err.response?.data?.error || err.response?.data || err.message || 'Failed to submit review'
+        
+        // Check for duplicate review error
+        if (err.response?.status === 409 || errorMessage.toLowerCase().includes('already reviewed')) {
+          alert('You have already reviewed this tour. Each user can only submit one review per tour.')
+        } else {
+          alert(errorMessage)
+        }
       } finally {
         reviewLoading.value = false
       }
@@ -595,6 +616,21 @@ export default {
 .btn-action:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.btn-edit {
+  background: #42b983;
+  color: white;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-edit:hover {
+  background: #35a372;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(66, 185, 131, 0.3);
 }
 
 .btn-publish {

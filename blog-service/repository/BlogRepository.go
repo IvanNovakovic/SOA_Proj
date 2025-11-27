@@ -107,3 +107,50 @@ func (r *BlogRepository) UpdateLikesCount(ctx context.Context, id primitive.Obje
 	_, err := r.coll.UpdateByID(ctx, id, bson.M{"$inc": bson.M{"likes_count": delta}})
 	return err
 }
+
+// Update updates a blog's title, description, and images
+func (r *BlogRepository) Update(ctx context.Context, id string, title, description string, images []string) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	update := bson.M{
+		"$set": bson.M{
+			"title":       title,
+			"description": description,
+			"images":      images,
+		},
+	}
+	_, err = r.coll.UpdateByID(ctx, oid, update)
+	return err
+}
+
+// Delete removes a blog by ID
+func (r *BlogRepository) Delete(ctx context.Context, id string) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	_, err = r.coll.DeleteOne(ctx, bson.M{"_id": oid})
+	return err
+}
+
+// GetByAuthorID returns blogs written by a specific author
+func (r *BlogRepository) GetByAuthorID(ctx context.Context, authorID string) ([]model.Blog, error) {
+	filter := bson.M{"author_id": authorID}
+	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}})
+	cur, err := r.coll.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var res []model.Blog
+	for cur.Next(ctx) {
+		var b model.Blog
+		if err := cur.Decode(&b); err != nil {
+			return nil, err
+		}
+		res = append(res, b)
+	}
+	return res, cur.Err()
+}
