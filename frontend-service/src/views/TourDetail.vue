@@ -302,6 +302,7 @@ export default {
 
     const isAuthor = computed(() => {
       const userId = authStore.getUserId()
+      console.log('Auth check - userId:', userId, 'authorId:', tour.value.authorId, 'match:', userId === tour.value.authorId)
       return userId === tour.value.authorId
     })
 
@@ -323,10 +324,12 @@ export default {
 
       try {
         const data = await api.getTourById(tourId)
+        console.log('Tour data received:', data)
         tour.value = {
           ...data,
           tags: data.tags || []
         }
+        console.log('Tour value after assignment:', tour.value)
       } catch (err) {
         error.value = err.response?.data?.error || err.message || 'Failed to load tour'
       } finally {

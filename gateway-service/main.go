@@ -367,8 +367,40 @@ func main() {
 			return
 		}
 
+		// Convert protobuf Tour to JSON with camelCase field names
+		tourJSON := map[string]interface{}{
+			"id":          resp.Tour.Id,
+			"authorId":    resp.Tour.AuthorId,
+			"name":        resp.Tour.Name,
+			"description": resp.Tour.Description,
+			"difficulty":  resp.Tour.Difficulty,
+			"tags":        resp.Tour.Tags,
+			"status":      resp.Tour.Status,
+			"price":       resp.Tour.Price,
+			"distance":    resp.Tour.Distance,
+			"durations": map[string]interface{}{
+				"walking": resp.Tour.Durations.Walking,
+				"biking":  resp.Tour.Durations.Biking,
+				"driving": resp.Tour.Durations.Driving,
+			},
+			"createdAt": resp.Tour.CreatedAt,
+		}
+		if resp.Tour.PublishedAt != "" {
+			tourJSON["publishedAt"] = resp.Tour.PublishedAt
+		}
+		if resp.Tour.ArchivedAt != "" {
+			tourJSON["archivedAt"] = resp.Tour.ArchivedAt
+		}
+
+		logger.WithFields(logrus.Fields{
+			"service":  "gateway-service",
+			"action":   "grpc_tour_response",
+			"tour_id":  resp.Tour.Id,
+			"authorId": resp.Tour.AuthorId,
+		}).Info("Sending tour response with authorId")
+
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp.Tour)
+		json.NewEncoder(w).Encode(tourJSON)
 	}
 
 	// gRPC handler for get tours by author
@@ -403,8 +435,37 @@ func main() {
 			return
 		}
 
+		// Convert protobuf Tours to JSON with camelCase field names
+		var toursJSON []map[string]interface{}
+		for _, tour := range resp.Tours {
+			tourJSON := map[string]interface{}{
+				"id":          tour.Id,
+				"authorId":    tour.AuthorId,
+				"name":        tour.Name,
+				"description": tour.Description,
+				"difficulty":  tour.Difficulty,
+				"tags":        tour.Tags,
+				"status":      tour.Status,
+				"price":       tour.Price,
+				"distance":    tour.Distance,
+				"durations": map[string]interface{}{
+					"walking": tour.Durations.Walking,
+					"biking":  tour.Durations.Biking,
+					"driving": tour.Durations.Driving,
+				},
+				"createdAt": tour.CreatedAt,
+			}
+			if tour.PublishedAt != "" {
+				tourJSON["publishedAt"] = tour.PublishedAt
+			}
+			if tour.ArchivedAt != "" {
+				tourJSON["archivedAt"] = tour.ArchivedAt
+			}
+			toursJSON = append(toursJSON, tourJSON)
+		}
+
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp.Tours)
+		json.NewEncoder(w).Encode(toursJSON)
 	}
 
 	// gRPC handler for get followers
@@ -470,12 +531,12 @@ func main() {
 			return
 		}
 
-		if strings.HasPrefix(path, "/tours/") && strings.Contains(path, "/author/") {
+		if r.Method == "GET" && strings.HasPrefix(path, "/tours/") && strings.Contains(path, "/author/") {
 			handleGetToursByAuthor(w, r, grpcClients.tourClient)
 			return
 		}
 
-		if strings.HasPrefix(path, "/tours/") && len(strings.Split(strings.Trim(path, "/"), "/")) == 2 {
+		if r.Method == "GET" && strings.HasPrefix(path, "/tours/") && len(strings.Split(strings.Trim(path, "/"), "/")) == 2 {
 			handleGetTourByID(w, r, grpcClients.tourClient)
 			return
 		}
