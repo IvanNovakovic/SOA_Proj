@@ -17,12 +17,31 @@
         <div class="navbar-links" :class="{ 'active': menuOpen }">
           <router-link to="/" class="nav-link" @click="closeMenu">Home</router-link>
           <router-link to="/tours" class="nav-link" @click="closeMenu">Tours</router-link>
-          <router-link to="/blogs" class="nav-link" @click="closeMenu">Blogs</router-link>
-          <router-link to="/blogs/my" class="nav-link" @click="closeMenu">My Blogs</router-link>
+          
+          <!-- Blogs Dropdown -->
+          <div class="nav-dropdown" @mouseenter="showBlogsDropdown = true" @mouseleave="showBlogsDropdown = false">
+            <button class="nav-link dropdown-toggle">
+              Blogs <span class="arrow">▼</span>
+            </button>
+            <div class="dropdown-menu" :class="{ 'show': showBlogsDropdown }">
+              <router-link to="/blogs" class="dropdown-item" @click="closeMenu">All Blogs</router-link>
+              <router-link to="/blogs/my" class="dropdown-item" @click="closeMenu">My Blogs</router-link>
+            </div>
+          </div>
+
           <router-link to="/recommendations" class="nav-link" @click="closeMenu">Discover</router-link>
-          <router-link v-if="isTourist" to="/purchased-tours" class="nav-link" @click="closeMenu">Purchased Tours</router-link>
-          <router-link to="/profile" class="nav-link" @click="closeMenu">Profile</router-link>
-          <router-link v-if="isAdmin" to="/admin/users" class="nav-link" @click="closeMenu">Admin</router-link>
+          
+          <!-- More Dropdown -->
+          <div class="nav-dropdown" @mouseenter="showMoreDropdown = true" @mouseleave="showMoreDropdown = false">
+            <button class="nav-link dropdown-toggle">
+              More <span class="arrow">▼</span>
+            </button>
+            <div class="dropdown-menu" :class="{ 'show': showMoreDropdown }">
+              <router-link v-if="isTourist" to="/purchased-tours" class="dropdown-item" @click="closeMenu">Purchased Tours</router-link>
+              <router-link to="/profile" class="dropdown-item" @click="closeMenu">Profile</router-link>
+              <router-link v-if="isAdmin" to="/admin/users" class="dropdown-item" @click="closeMenu">Admin Panel</router-link>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -35,7 +54,7 @@
           <span class="user-name">{{ username }}</span>
 
           <!-- CART ICON -->
-          <router-link v-if="isTourist" to="/cart" class="cart-icon">
+          <router-link v-if="isTourist" to="/cart" class="cart-icon" title="Shopping Cart">
             🛒
             <span v-if="cartCount > 0" class="cart-count">{{ cartCount }}</span>
           </router-link>
@@ -58,6 +77,8 @@ export default {
   setup() {
     const router = useRouter()
     const menuOpen = ref(false)
+    const showBlogsDropdown = ref(false)
+    const showMoreDropdown = ref(false)
 
     const isLoggedIn = authStore.isAuthenticated
     const username = authStore.username
@@ -93,6 +114,8 @@ export default {
 
     const closeMenu = () => {
       menuOpen.value = false
+      showBlogsDropdown.value = false
+      showMoreDropdown.value = false
     }
 
     const logout = () => {
@@ -103,6 +126,8 @@ export default {
     }
     return {
       menuOpen,
+      showBlogsDropdown,
+      showMoreDropdown,
       isLoggedIn,
       username,
       isAdmin,
@@ -172,7 +197,7 @@ export default {
 
 .navbar-links {
   display: flex;
-  gap: 2rem;
+  gap: 1.5rem;
   align-items: center;
 }
 
@@ -184,11 +209,78 @@ export default {
   padding: 0.5rem 1rem;
   border-radius: 6px;
   transition: background 0.3s ease;
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 
 .nav-link:hover,
 .nav-link.router-link-active {
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* Dropdown Styles */
+.nav-dropdown {
+  position: relative;
+}
+
+.dropdown-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.arrow {
+  font-size: 0.7rem;
+  transition: transform 0.3s ease;
+}
+
+.nav-dropdown:hover .arrow {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 180px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.3s ease;
+  margin-top: 0.5rem;
+  overflow: hidden;
+}
+
+.dropdown-menu.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.dropdown-item {
+  display: block;
+  padding: 0.75rem 1.25rem;
+  color: #333;
+  text-decoration: none;
+  transition: background 0.2s ease;
+  font-weight: 500;
+}
+
+.dropdown-item:hover {
+  background: #f0f0f0;
+  color: #667eea;
+}
+
+.dropdown-item:first-child {
+  padding-top: 1rem;
+}
+
+.dropdown-item:last-child {
+  padding-bottom: 1rem;
 }
 
 .navbar-auth {
@@ -289,6 +381,42 @@ export default {
     width: 100%;
     text-align: center;
     padding: 1rem;
+  }
+
+  /* Mobile Dropdown Styles */
+  .nav-dropdown {
+    width: 100%;
+  }
+
+  .dropdown-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .dropdown-menu {
+    position: static;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    box-shadow: none;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 0;
+    display: none;
+  }
+
+  .nav-dropdown:hover .dropdown-menu,
+  .dropdown-menu.show {
+    display: block;
+  }
+
+  .dropdown-item {
+    color: white;
+    text-align: center;
+  }
+
+  .dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
   }
 }
 

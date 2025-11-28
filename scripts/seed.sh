@@ -12,7 +12,7 @@ echo -e "${CYAN}  Database Seeding Script${NC}"
 echo -e "${CYAN}========================================${NC}\n"
 
 # Check if Python3 is installed
-if ! command -v python3 &> /dev/null; then
+if ! command -v python &> /dev/null; then
     echo -e "${RED}Error: Python3 is not installed${NC}"
     exit 1
 fi
@@ -37,12 +37,12 @@ source venv/bin/activate 2>/dev/null || source venv/Scripts/activate 2>/dev/null
 
 # Install dependencies
 echo -e "${YELLOW}Installing dependencies...${NC}"
-pip install -q -r scripts/requirements.txt
+pip install -q -r requirements.txt
 echo -e "${GREEN}✓ Dependencies installed${NC}\n"
 
 # Run the seeding script
 echo -e "${CYAN}Starting database seeding...${NC}\n"
-python3 scripts/seed_all_databases.py
+python seed_all_databases.py
 
 # Deactivate virtual environment
 deactivate 2>/dev/null

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Database Seeding Script
 Wipes and populates all databases with test data including:
@@ -11,16 +12,23 @@ Wipes and populates all databases with test data including:
 import requests
 import time
 import sys
+import io
 from datetime import datetime, timedelta
 import random
 from pymongo import MongoClient
 from neo4j import GraphDatabase
+
+# Set UTF-8 encoding for Windows console
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # Service URLs
 GATEWAY_URL = "http://localhost:8080"
 STAKEHOLDERS_URL = "http://localhost:8084"
 BLOG_URL = "http://localhost:8081"
 TOUR_URL = "http://localhost:8083"
+FOLLOWER_URL = "http://localhost:8082"
 
 # Database connections
 MONGO_URI = "mongodb://localhost:27017"
@@ -61,7 +69,7 @@ USERS = [
         "email": "john@example.com",
         "name": "John",
         "surname": "Guide",
-        "roles": ["tourist", "guide"],
+        "roles": ["guide"],
         "address": {"street": "123 Main St", "city": "New York", "country": "USA"},
         "biography": "Experienced tour guide specializing in historical tours",
         "motto": "Discover history, one step at a time"
@@ -72,7 +80,7 @@ USERS = [
         "email": "sarah@example.com",
         "name": "Sarah",
         "surname": "Explorer",
-        "roles": ["tourist", "guide"],
+        "roles": ["guide"],
         "address": {"street": "456 Oak Ave", "city": "London", "country": "UK"},
         "biography": "Adventure guide and nature enthusiast",
         "motto": "Life is an adventure!"
@@ -94,7 +102,7 @@ USERS = [
         "email": "emma@example.com",
         "name": "Emma",
         "surname": "Guide",
-        "roles": ["tourist", "guide"],
+        "roles": ["guide"],
         "address": {"street": "321 Elm St", "city": "Berlin", "country": "Germany"},
         "biography": "Cultural tour specialist with 10 years experience",
         "motto": "Every place has a story"
@@ -116,7 +124,7 @@ USERS = [
         "email": "lisa@example.com",
         "name": "Lisa",
         "surname": "Guide",
-        "roles": ["tourist", "guide"],
+        "roles": ["guide"],
         "address": {"street": "987 Cedar Ln", "city": "Sydney", "country": "Australia"},
         "biography": "Coastal and marine tour expert",
         "motto": "The ocean is calling"
@@ -360,14 +368,14 @@ def register_user(user_data):
     """Register a single user"""
     try:
         response = requests.post(
-            f"{STAKEHOLDERS_URL}/api/users/register",
+            f"{STAKEHOLDERS_URL}/auth/register",
             json=user_data,
             timeout=5
         )
         
         if response.status_code in [200, 201]:
             data = response.json()
-            user_id = data.get("id") or data.get("_id")
+            user_id = data.get("id") or data.get("ID")
             print_success(f"Created user: {user_data['username']} (ID: {user_id})")
             return user_id
         else:
@@ -381,15 +389,16 @@ def login_user(username, password):
     """Login and get JWT token"""
     try:
         response = requests.post(
-            f"{STAKEHOLDERS_URL}/api/users/login",
+            f"{STAKEHOLDERS_URL}/auth/login",
             json={"username": username, "password": password},
             timeout=5
         )
         
         if response.status_code == 200:
             data = response.json()
-            token = data.get("token")
-            user_id = data.get("userId")
+            token = data.get("access_token")
+            user_data = data.get("user", {})
+            user_id = user_data.get("id")
             if token:
                 print_success(f"Logged in: {username}")
                 return token, user_id
@@ -404,8 +413,8 @@ def create_follow_relationship(follower_token, follower_id, followee_id):
     """Create a follow relationship"""
     try:
         response = requests.post(
-            f"{GATEWAY_URL}/follow",
-            json={"followerId": follower_id, "followeeId": followee_id},
+            f"{FOLLOWER_URL}/follow",
+            json={"followee": followee_id},
             headers={"Authorization": f"Bearer {follower_token}"},
             timeout=5
         )
@@ -503,13 +512,16 @@ def like_blog_post(liker_token, blog_id):
     """Like a blog post"""
     try:
         response = requests.post(
-            f"{BLOG_URL}/blogs/{blog_id}/like",
+            f"{BLOG_URL}/blogs/{blog_id}/likes",
+            json={},  # Empty body since user ID comes from JWT
             headers={"Authorization": f"Bearer {liker_token}"},
             timeout=5
         )
         
         if response.status_code in [200, 201]:
             return True
+        else:
+            print_error(f"Failed to like blog {blog_id}: {response.status_code} - {response.text}")
         return False
     except Exception as e:
         return False
@@ -643,14 +655,14 @@ def main():
     # Seed data
     seed_users()
     seed_follows()
-    seed_tours()
+    # seed_tours()  # Disabled - not creating tours
     seed_blogs()
     
     # Summary
     print_header("SEEDING COMPLETE")
     print_success(f"✓ {len(created_users)} users created")
     print_success(f"✓ {len(FOLLOW_RELATIONSHIPS)} follow relationships created")
-    print_success(f"✓ {len(created_tours)} tours created")
+    # print_success(f"✓ {len(created_tours)} tours created")
     print_success(f"✓ {len(BLOG_POSTS)} blog posts created (with comments and likes)")
     
     print(f"\n{Colors.OKBLUE}{'='*60}{Colors.ENDC}")

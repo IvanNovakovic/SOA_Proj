@@ -69,7 +69,7 @@ scripts\seed.bat
 
 ### 1. Login as a user
 ```bash
-curl -X POST http://localhost:8084/api/users/login \
+curl -X POST http://localhost:8084/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"john_guide","password":"password123"}'
 ```
