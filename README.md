@@ -36,6 +36,35 @@ docker-compose up --build
 - App: http://localhost:8087
 - API: http://localhost:8080
 
+## Database Seeding
+
+Populate the databases with test data (users, follows, tours, blogs):
+
+**Windows:**
+```bash
+cd scripts
+seed.bat
+```
+
+**Linux/Mac:**
+```bash
+cd scripts
+./seed.sh
+```
+
+This creates:
+- 8 test users (guides, tourists, admin)
+- 15 follow relationships
+- 7 tours with various difficulties
+- 6 blog posts with comments and likes
+
+**Login credentials:** All users have password `password123`
+- Guides: `john_guide`, `sarah_explorer`, `emma_guide`, `lisa_guide`
+- Tourists: `mike_tourist`, `alex_wanderer`, `david_blogger`
+- Admin: `anna_admin`
+
+See [scripts/README.md](scripts/README.md) for details.
+
 ## Development
 
 ```bash
