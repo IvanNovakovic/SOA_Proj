@@ -141,10 +141,10 @@ func updateTour(repo tourRepo) http.HandlerFunc {
 		if req.Status != "" {
 			updates["status"] = req.Status
 		}
-		if req.Price >= 0 {
+		if req.Price > 0 {
 			updates["price"] = req.Price
 		}
-		if req.Distance >= 0 {
+		if req.Distance > 0 {
 			updates["distance"] = req.Distance
 		}
 		if req.Durations != nil {
